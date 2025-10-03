@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonts */
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/700.css';
+@import '@fontsource/orbitron/700.css';
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { @apply bg-black text-term-green font-mono antialiased; }
+
+  a { @apply underline decoration-dotted underline-offset-4; }
+  a:hover { @apply text-term-green-dark; }
+}
+
+@layer components {
+  .container-page { @apply max-w-5xl mx-auto px-4 sm:px-6 lg:px-8; }
+
+  .navbar {
+    @apply border-b border-term-green/40 bg-black/60 backdrop-blur-xs sticky top-0 z-40;
+  }
+  .navbar-inner { @apply container-page flex items-center justify-between h-14; }
+  .navbar-brand { @apply font-bold tracking-wider text-term-green hover:text-term-green-dark; }
+  .navbar-links { @apply flex gap-6 text-sm; }
+  .navbar-link { @apply text-term-green/90 hover:text-term-green-dark; }
+
+  .terminal-window {
+    @apply bg-black border border-term-green/60 rounded-md p-6 shadow-inner;
+  }
+  .terminal-header {
+    @apply border-b border-term-green/40 pb-2 mb-4 flex items-center justify-between;
+  }
+  .terminal-prompt { @apply text-term-green/80 font-bold tracking-widest; }
+  .ascii-art { @apply select-none; }
+
+  .footer { @apply border-t border-term-green/40 py-6 mt-16 text-sm text-term-green/80; }
+}
+
+@layer utilities {
+  .glow { @apply animate-glow; }
+}

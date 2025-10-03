@@ -1,16 +1,49 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
 
+const allPosts = await getCollection('blog', ({ data }) => {
+  return data.draft !== true;
+});
+
+const latestPosts = allPosts
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="Home">
+  <section class="mb-10">
+    <h1 class="text-3xl font-bold text-term-green uppercase">SHART.CLOUD</h1>
+    <p class="text-term-green/80 mt-2">Cloud security education done in a 💩 way.</p>
+
+    <div class="mt-4 flex gap-4 text-sm">
+      <a class="navbar-link" href="/ctf">CTFs</a>
+      <a class="navbar-link" href="/blog">Blog</a>
+    </div>
+  </section>
+
+  {latestPosts.length > 0 && (
+    <section class="terminal-window">
+      <h2 class="text-xl font-bold mb-4">Recent Posts</h2>
+
+      <ul class="space-y-2">
+        {latestPosts.map((post) => (
+          <li class="flex items-center justify-between">
+            <a class="hover:text-term-green-dark" href={`/blog/${post.slug}`}>
+              {post.data.title}
+            </a>
+            <span class="text-xs text-term-green/70">
+              {new Date(post.data.date).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <p class="mt-4 text-sm"><a class="hover:text-term-green-dark" href="/blog">View all posts →</a></p>
+    </section>
+  )}
+</BaseLayout>

@@ -1,0 +1,86 @@
+---
+export interface Props {
+  name?: string;
+  width?: number;
+  height?: number;
+  awards?: number; // number of trophies to render
+}
+
+const {
+  name = '0xYOU',
+  width = 512,
+  height = 320,
+  awards = 3,
+} = Astro.props;
+
+const trophy = '🏆';
+const poop = '💩';
+const trophies = Array.from({ length: Math.max(0, Math.min(awards, 6)) }).map(() => trophy).join(' ');
+
+// Layout metrics and spacing
+const headerY = 56;
+const nameY = 140;
+const subtitleFS = 14;
+const emojiFS = 28;
+const emojiMT = 16; // margin-top above emoji row
+const emojiMB = 20; // margin-bottom below emoji row
+const subtitleY = nameY + 30; // ~170
+// Place emoji baseline so that top of glyphs has room: add font-size to margin
+const emojiY = subtitleY + emojiMT + emojiFS;
+// Ensure footer sits below emoji line with desired margin, but stays within canvas
+const footerY = Math.min(height - 12, Math.max(height - 26, emojiY + emojiMB));
+---
+
+<svg
+  width={width}
+  height={height}
+  viewBox={`0 0 ${width} ${height}`}
+  role="img"
+  aria-label={`SHART.CLOUD Certificate for ${name}`}
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#001900" />
+      <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2" result="coloredBlur" />
+      <feMerge>
+        <feMergeNode in="coloredBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="100%" height="100%" fill="url(#bg)" />
+
+  <!-- Border -->
+  <rect x="8" y="8" width={width - 16} height={height - 16} fill="none" stroke="#33ff33" stroke-opacity="0.6" stroke-width="2" rx="8" ry="8" />
+
+  <!-- Header -->
+  <text x="50%" y={headerY} text-anchor="middle" fill="#33ff33" font-size="20" font-family="monospace" filter="url(#glow)">
+    SHART.CLOUD CERTIFICATE
+  </text>
+
+  <!-- Name Line -->
+  <text x="50%" y={nameY} text-anchor="middle" fill="#33ff33" font-size="40" font-family="monospace" font-weight="700" filter="url(#glow)">
+    {name}
+  </text>
+
+  <!-- Subtitle -->
+  <text x="50%" y={subtitleY} text-anchor="middle" fill="#33ff33" font-size={subtitleFS} font-family="monospace" opacity="0.8">
+    Cloud Security Shenanigans Achiever
+  </text>
+
+  <!-- Emoji Row -->
+  <text x="50%" y={emojiY} text-anchor="middle" font-size={emojiFS}>
+    {poop} {trophies}
+  </text>
+
+  <!-- Footer Note -->
+  <text x="50%" y={footerY} text-anchor="middle" fill="#33ff33" font-size="12" font-family="monospace" opacity="0.7">
+    brag to your friends about achievements~!
+  </text>
+</svg>

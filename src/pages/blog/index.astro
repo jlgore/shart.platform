@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogCard from '../../components/blog/BlogCard.astro';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('blog', ({ data }) => {
+  return data.draft !== true;
+});
+
+const posts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const categories = ['all', 'cloud-security', 'ctf-writeups', 'tutorials', 'rants'];
+const currentCategory = Astro.url.searchParams.get('category') || 'all';
+
+const filteredPosts = currentCategory === 'all' 
+  ? posts 
+  : posts.filter(post => post.data.category === currentCategory);
+
+const allTags = [...new Set(posts.flatMap(post => post.data.tags))].sort();
+---
+
+<BaseLayout title="Blog" description="Cloud security insights, CTF writeups, and irreverent takes on the industry">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <!-- Simplified Header -->
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-green-400 mb-4">Blog</h1>
+
+      <!-- Category Filter -->
+      <div class="flex flex-wrap gap-2 mb-6">
+        {categories.map((category) => (
+          <a
+            href={category === 'all' ? '/blog' : `/blog?category=${category}`}
+            class={`text-sm font-mono px-3 py-1 rounded ${
+              currentCategory === category
+                ? 'text-black bg-green-400'
+                : 'text-green-400 hover:text-green-300 border border-green-400 hover:bg-green-400 hover:text-black'
+            }`}
+          >
+            {category === 'all' ? 'All' : category.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div>
+      {filteredPosts.length === 0 ? (
+        <div class="text-center py-12">
+          <p class="text-green-400 text-lg mb-4">
+            {currentCategory !== 'all' ? (
+              <>No posts found in category: {currentCategory.replace('-', ' ')}</>
+            ) : (
+              "No posts available yet."
+            )}
+          </p>
+          {currentCategory !== 'all' && (
+            <a href="/blog" class="text-green-300 hover:text-green-200 underline">
+              View all posts
+            </a>
+          )}
+        </div>
+      ) : (
+        <div class="space-y-6">
+          {filteredPosts.map((post) => (
+            <BlogCard post={post} />
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+</BaseLayout>

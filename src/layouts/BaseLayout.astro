@@ -1,0 +1,48 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "crappy cloud security training platform" } = Astro.props;
+import "../styles/global.css";
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} | SHART.CLOUD</title>
+  </head>
+  <body class="bg-black text-term-green">
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a class="navbar-brand" href="/">SHART.CLOUD</a>
+        <div class="navbar-links">
+          <a class="navbar-link" href="/blog">Blog</a>
+          <a class="navbar-link" href="/ctf">CTF</a>
+          <a class="navbar-link" href="/about">About</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container-page py-10">
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="container-page flex items-center justify-between">
+        <p>&copy; {new Date().getFullYear()} SHART.CLOUD</p>
+        <p>
+          <a class="mr-2" href="/privacy">Privacy</a>
+          <span class="opacity-40">|</span>
+          <a class="mx-2" href="/terms">Terms</a>
+          <span class="opacity-40">|</span>
+          <a class="ml-2" href="https://github.com/shart-cloud">GitHub</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

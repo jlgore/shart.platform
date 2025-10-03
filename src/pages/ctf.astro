@@ -1,0 +1,93 @@
+---
+import CTFLayout from '../layouts/CTFLayout.astro';
+import { getCollection } from 'astro:content';
+import CertificateSVG from '../components/ctf/CertificateSVG.astro';
+
+const challenges = (await getCollection('ctf')).sort(
+  (a, b) => a.data.launchDate.getTime() - b.data.launchDate.getTime()
+);
+---
+
+<CTFLayout title="Capture The Flag" description="Challenge catalog, downloads, and scoreboard placeholders">
+  <section class="space-y-10">
+    <div class="terminal-window">
+      <div class="terminal-header">
+        <span class="text-xs text-term-green/80">CATALOG</span>
+        <span class="text-xs text-term-green/60">{challenges.length} entries</span>
+      </div>
+      <ul class="space-y-8">
+        {challenges.map(({ slug, data }) => {
+          const launch = data.launchDate.toLocaleDateString(undefined, {
+            year: 'numeric', month: 'long', day: 'numeric'
+          });
+          const labelLower = (data.releaseLabel ?? '').toLowerCase().trim();
+          const isPre = data.isReleased && /alpha|beta|rc|preview/.test(labelLower);
+          const status = !data.isReleased
+            ? '⏳ Not Released'
+            : labelLower.includes('beta')
+              ? 'β beta'
+              : labelLower.includes('alpha')
+                ? 'α alpha'
+                : labelLower
+                  ? `✅ ${data.releaseLabel}`
+                  : '✅ Released';
+          const statusClasses = !data.isReleased
+            ? 'px-2 py-1 rounded uppercase select-none opacity-70 cursor-not-allowed pointer-events-none border border-dashed border-term-green/30'
+            : isPre
+              ? 'px-2 py-1 rounded uppercase border border-term-amber/60 text-term-amber'
+              : 'px-2 py-1 rounded uppercase border border-term-green/60 text-term-green';
+          return (
+            <li class="border border-term-green/40 rounded-md p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="text-lg font-bold">
+                    <a href={`/ctf/${slug}`} class="hover:text-term-green-dark">{data.title}</a>
+                  </h2>
+                  <p class="text-sm text-term-green/80"><strong>Launch:</strong> {launch}</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="px-2 py-1 border border-term-green/50 rounded uppercase">{data.category}</span>
+                  <span class="px-2 py-1 border border-term-green/50 rounded uppercase">{data.difficulty}</span>
+                  <span class={statusClasses} aria-disabled={!data.isReleased} title={status}>{status}</span>
+                </div>
+              </div>
+              <p class="mt-3">{data.description}</p>
+
+              <div class="mt-4 flex flex-wrap items-center gap-4 text-sm">
+                {data.isReleased && (
+                  <a href={data.repoUrl} rel="noopener noreferrer" target="_blank" class="text-term-green/90 hover:text-term-green-dark">View Source ↗</a>
+                )}
+                {data.downloads.length > 0 && (
+                  <div class="flex items-center gap-3 flex-wrap">
+                    {data.downloads.map((d) => (
+                      <a href={d.url} target="_blank" rel="noopener noreferrer" class="px-2 py-1 border border-term-green/50 rounded hover:text-term-green-dark">
+                        {d.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <a href={`/ctf/${slug}`} class="underline underline-offset-4 decoration-dotted hover:text-term-green-dark">View Challenge →</a>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+
+    <div class="terminal-window">
+      <div class="terminal-header">
+        <span class="text-xs text-term-green/80">SCOREBOARD</span>
+        <span class="text-xs text-term-green/60">Bragging Rights for PWNING Shart</span>
+      </div>
+      <div class="flex flex-col sm:flex-row items-center gap-6">
+        <div class="border border-term-green/40 rounded">
+          <CertificateSVG name="0xYOU" width={384} height={240} awards={3} />
+        </div>
+        <div class="text-sm text-term-green/80">
+          <p>Scoreboard coming soon.</p>
+          <p class="mt-2 italic">brag to your friends about achievements~!</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</CTFLayout>

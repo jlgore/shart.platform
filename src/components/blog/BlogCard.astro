@@ -1,0 +1,77 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+export interface Props {
+  post: CollectionEntry<'blog'>;
+}
+
+const { post } = Astro.props;
+const { title, description, date, category, tags, readTime } = post.data;
+const isLinkPost = post.data.isLinkPost === true && typeof post.data.externalLink === 'string';
+const href = isLinkPost ? post.data.externalLink! : `/blog/${post.slug}`;
+const linkHost = isLinkPost ? new URL(post.data.externalLink!).hostname.replace(/^www\./, '') : '';
+
+const categorySymbols = {
+  'cloud-security': '[SEC]',
+  'ctf-writeups': '[CTF]',
+  'tutorials': '[TUT]',
+  'rants': '[RNT]'
+};
+
+const difficultyLevels = {
+  'beginner': '▓░░░░',
+  'intermediate': '▓▓▓░░',
+  'advanced': '▓▓▓▓▓'
+};
+---
+
+<article class="bg-black border border-green-400 p-6 mb-6 hover:bg-green-950 hover:bg-opacity-20 transition-colors">
+  <a href={href} class="block" target={isLinkPost ? '_blank' : undefined} rel={isLinkPost ? 'noopener noreferrer' : undefined}>
+    <div class="flex items-start justify-between mb-3">
+      <div class="flex items-center gap-4 text-sm">
+        <span class="text-amber-400 font-semibold px-2 py-1 bg-amber-400 bg-opacity-10 rounded">
+          {categorySymbols[category]}
+        </span>
+        {isLinkPost && (
+          <span class="text-green-300/80 border border-green-400/40 px-2 py-0.5 rounded text-[11px] uppercase tracking-wide">Link</span>
+        )}
+        <span class="text-green-300">
+          {new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })}
+        </span>
+      </div>
+      {!isLinkPost && (
+        <span class="text-sm text-green-300">{readTime} min read</span>
+      )}
+    </div>
+
+    <h3 class="text-green-400 font-bold mb-3 hover:text-green-300 text-lg">
+      {title} {isLinkPost && (<span class="opacity-80">↗</span>)}
+    </h3>
+
+    <p class="text-green-300 text-sm mb-4 opacity-90 line-clamp-2">
+      {description}
+    </p>
+
+    <div class="flex items-center justify-between">
+      <div class="flex flex-wrap gap-2">
+        {tags.slice(0, 4).map((tag) => (
+          <span class="text-xs text-green-400 opacity-70 bg-green-400 bg-opacity-10 px-2 py-1 rounded">
+            {tag}
+          </span>
+        ))}
+        {tags.length > 4 && (
+          <span class="text-xs text-green-300 opacity-50">
+            +{tags.length - 4} more
+          </span>
+        )}
+      </div>
+      <span class="text-sm text-green-400 hover:text-green-300">
+        {isLinkPost ? `Read on ${linkHost} ↗` : 'Read more →'}
+      </span>
+    </div>
+  </a>
+</article>

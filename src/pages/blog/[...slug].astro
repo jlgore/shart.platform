@@ -1,0 +1,28 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BlogLayout from '../../layouts/BlogLayout.astro';
+
+export async function getStaticPaths() {
+  // Include all posts; link posts will redirect to their external target.
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: post,
+  }));
+}
+
+type Props = CollectionEntry<'blog'>;
+
+const post = Astro.props as Props;
+
+// Redirect link posts to their external URL (works in dev and build)
+if (post.data.isLinkPost && post.data.externalLink) {
+  return Astro.redirect(post.data.externalLink);
+}
+
+const { Content } = await post.render();
+---
+
+<BlogLayout post={post}>
+  <Content />
+</BlogLayout>

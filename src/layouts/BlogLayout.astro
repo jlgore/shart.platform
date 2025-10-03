@@ -1,0 +1,185 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { type CollectionEntry } from 'astro:content';
+
+export interface Props {
+  post: CollectionEntry<'blog'>;
+}
+
+const { post } = Astro.props;
+const { title, description, date, author, category, tags, readTime } = post.data;
+
+const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+};
+
+const categorySymbols = {
+  'cloud-security': '[SEC]',
+  'ctf-writeups': '[CTF]',
+  'tutorials': '[TUT]',
+  'rants': '[RNT]'
+};
+---
+
+<BaseLayout title={title} description={description}>
+  <article class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="terminal-window">
+      <!-- Post Header -->
+      <div class="terminal-header mb-4">
+        <span class="text-green-400 text-xs">DOCUMENT #{Math.floor(Math.random() * 9999).toString().padStart(4, '0')}</span>
+      </div>
+      
+      <div class="mb-6">
+        <div class="flex items-center gap-3 mb-4 text-xs">
+          <span class="text-amber-400 font-bold">{categorySymbols[category]}</span>
+          <span class="text-green-300">DATE: {formatDate(date)}</span>
+          <span class="text-green-300">TIME: {readTime}min</span>
+        </div>
+        
+        <pre class="ascii-art text-xs text-green-400 mb-4">
+════════════════════════════════════════════════════════════════════
+        </pre>
+        
+        <h1 class="text-2xl font-bold text-green-400 mb-4 uppercase">
+          {title}
+        </h1>
+        
+        <p class="text-green-300 mb-4 text-sm">
+          &gt; {description}
+        </p>
+        
+        <div class="flex items-center justify-between mb-6">
+          <div class="text-xs">
+            <span class="text-green-400">AUTHOR: </span>
+            <span class="text-green-300">{author.toUpperCase()}</span>
+          </div>
+          
+          <div class="flex gap-2 flex-wrap">
+            {tags.map((tag) => (
+              <a 
+                href={`/blog/tags/${tag}`}
+                class="text-xs text-green-400 hover:text-green-300"
+              >
+                #{tag}
+              </a>
+            ))}
+          </div>
+        </div>
+        
+        <pre class="ascii-art text-xs text-green-400 mb-6">
+════════════════════════════════════════════════════════════════════
+        </pre>
+      </div>
+      
+      <!-- Post Content -->
+      <div class="prose prose-terminal max-w-none text-green-400">
+        <style>
+          .prose-terminal {
+            color: #33ff33;
+          }
+          .prose-terminal h2,
+          .prose-terminal h3,
+          .prose-terminal h4 {
+            color: #33ff33;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
+          }
+          .prose-terminal h2::before {
+            content: '## ';
+            color: #ffb000;
+          }
+          .prose-terminal h3::before {
+            content: '### ';
+            color: #ffb000;
+          }
+          .prose-terminal p {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+          }
+          .prose-terminal a {
+            color: #33ff33;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+          }
+          .prose-terminal a:hover {
+            text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
+          }
+          .prose-terminal code {
+            background: black;
+            border: 1px solid #33ff33;
+            color: #33ff33;
+            padding: 0.125rem 0.375rem;
+            font-size: 0.875rem;
+            text-shadow: 0 0 5px rgba(51, 255, 51, 0.3);
+          }
+          .prose-terminal pre {
+            background: black !important;
+            border: 2px solid #33ff33 !important;
+            color: #33ff33 !important;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+          }
+          .prose-terminal pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+          }
+          .prose-terminal blockquote {
+            border-left: 4px solid #ffb000;
+            padding-left: 1rem;
+            color: #ffb000;
+            font-style: normal;
+            margin: 1.5rem 0;
+          }
+          .prose-terminal ul,
+          .prose-terminal ol {
+            margin: 1rem 0;
+            padding-left: 2rem;
+          }
+          .prose-terminal li {
+            margin: 0.5rem 0;
+          }
+          .prose-terminal li::marker {
+            color: #ffb000;
+          }
+          .prose-terminal strong {
+            color: #ffb000;
+            text-shadow: 0 0 5px rgba(255, 176, 0, 0.5);
+          }
+          .prose-terminal em {
+            color: #33ff33;
+            font-style: normal;
+            text-decoration: underline;
+            text-decoration-style: wavy;
+          }
+        </style>
+        <slot />
+      </div>
+      
+      <!-- Post Footer -->
+      <div class="mt-12 pt-6 border-t-2 border-green-400">
+        <pre class="ascii-art text-xs text-green-400 text-center mb-4">
+═══════════════[ END OF DOCUMENT ]═══════════════
+        </pre>
+        
+        <div class="text-center text-xs text-green-300">
+          <div class="terminal-prompt mb-2">
+            EOF
+          </div>
+          <a href="/blog" class="text-green-400 hover:text-green-300">
+            &lt;&lt; RETURN TO BLOG DATABASE
+          </a>
+        </div>
+      </div>
+    </div>
+  </article>
+</BaseLayout>

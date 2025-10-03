@@ -1,0 +1,44 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const bios = await getCollection('bios');
+const sortedBios = bios.sort((a, b) => a.data.order - b.data.order);
+---
+
+<BaseLayout title="About">
+  <h1 class="text-2xl font-bold text-term-green uppercase">About Us</h1>
+
+  <p class="text-term-green/80 mt-2 mb-6">Meet the team behind SHART.CLOUD.</p>
+
+  <div class="grid gap-6 sm:grid-cols-2">
+    {sortedBios.map((person) => (
+      <section class="terminal-window">
+        {person.data.image && (
+          <img class="mb-3 rounded" src={person.data.image} alt={person.data.name} width="200" />
+        )}
+        <h2 class="text-lg font-bold">{person.data.name}</h2>
+        <p class="text-sm text-term-green/80 mb-3">{person.data.role}</p>
+        <p class="mb-4">{person.data.bio}</p>
+
+        <p class="text-sm">
+          {person.data.bluesky && (
+            <>
+              <a class="hover:text-term-green-dark" href={`https://bsky.app/profile/${person.data.bluesky}`}>Bluesky</a>
+              {' | '}
+            </>
+          )}
+          {person.data.github && (
+            <>
+              <a class="hover:text-term-green-dark" href={`https://github.com/${person.data.github}`}>GitHub</a>
+              {' | '}
+            </>
+          )}
+          {person.data.website && (
+            <a class="hover:text-term-green-dark" href={person.data.website}>Website</a>
+          )}
+        </p>
+      </section>
+    ))}
+  </div>
+</BaseLayout>
