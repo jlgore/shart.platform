@@ -1,7 +1,7 @@
 ---
 name: "Jared Gore"
 role: "Cloud Bill Generator"
-bio: "Your bio description here."
+bio: "shart security engineering."
 bluesky: "shart.cloud"
 github: "https://github.com/jlgore"
 website: "https://jaredgore.com"

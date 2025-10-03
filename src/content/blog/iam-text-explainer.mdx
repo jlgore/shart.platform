@@ -1,0 +1,31 @@
+---
+title: "IAM Policies in Human Language"
+description: "A text-first, no-graph explainer that tells you exactly who can do what."
+date: 2025-10-03
+author: "Jared Gore"
+category: "cloud-security"
+tags: ["iam", "policy", "explainer"]
+readTime: 6
+draft: false
+---
+
+import IAMPolicyExplainer from '../../components/iam/IAMPolicyExplainer';
+
+# IAM Policies, But Make It Human
+
+This interactive explainer turns policy JSON into plain English:
+“Jane can do X; Captain cannot do Y.” Quick answers, zero fluff.
+
+<IAMPolicyExplainer client:only="react" />
+
+## What This Shows
+
+- Edit the policy JSON and instantly see who can do what.
+- Explicit Deny beats Allow, just like the real world.
+- Wildcards work: `spaces:*`, `db:prod-*`, etc.
+- Optional `Principal` scoping to target users or roles.
+
+## Why This Style?
+
+Most policy questions boil down to one thing: “Can they do it?”
+This component answers that fast—then gets out of your way.
