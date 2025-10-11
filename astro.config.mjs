@@ -20,4 +20,9 @@ export default defineConfig({
   adapter: cloudflare({
     imageService: 'compile'
   }),
+  vite: {
+    ssr: {
+      external: ['node:path', 'node:fs/promises']
+    }
+  }
 });
