@@ -1,3 +1,4 @@
+[env.prod]
 name = "shart-platform-prod"
 main = "./dist/_worker.js/index.js"
 compatibility_date = "2025-03-25"
@@ -13,3 +14,6 @@ enabled = true
 # Development environment
 [env.dev]
 name = "shart-platform-dev"
+[[routes]]
+pattern = "shop.example.com"
+custom_domain = true

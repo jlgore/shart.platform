@@ -8,6 +8,10 @@ export interface Props {
 
 const { post } = Astro.props;
 const { title, description, date, author, category, tags, readTime } = post.data;
+// Absolute OG image URL for this post
+const siteOrigin = (Astro.site as any)?.origin || (import.meta as any)?.env?.PUBLIC_SITE_URL || '';
+const ogImagePath = `/og/blog/${post.slug}.png`;
+const ogImageUrl = siteOrigin ? `${siteOrigin}${ogImagePath}` : ogImagePath;
 
 const formatDate = (date: Date) => {
   return new Intl.DateTimeFormat('en-US', {
@@ -26,6 +30,20 @@ const categorySymbols = {
 ---
 
 <BaseLayout title={title} description={description}>
+  <Fragment slot="head">
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="article" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="675" />
+    <meta property="og:image:alt" content={title} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content={title} />
+  </Fragment>
   <article class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <div class="terminal-window">
       <!-- Post Header -->

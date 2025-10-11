@@ -6,6 +6,21 @@ export interface Props {
 
 const { title, description = "crappy cloud security training platform" } = Astro.props;
 import "../styles/global.css";
+
+// Server-only/build-time env for Discord invite visibility
+const discordInviteEnabled = String((import.meta as any)?.env?.DISCORD_SERVER_INVITE ?? "")
+  .toLowerCase()
+  .trim() === "true";
+const discordInviteUrl: string | undefined = (() => {
+  try {
+    const fromImport = (import.meta as any)?.env?.DISCORD_INVITE_URL as string | undefined;
+    const fromProcess = typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
+    return fromImport || fromProcess;
+  } catch {
+    return typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
+  }
+})();
+const showDiscordInvite = discordInviteEnabled && !!discordInviteUrl;
 ---
 
 <!DOCTYPE html>
@@ -15,6 +30,7 @@ import "../styles/global.css";
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} | SHART.CLOUD</title>
+    <slot name="head" />
   </head>
   <body class="bg-black text-term-green">
     <nav class="navbar">
@@ -23,7 +39,11 @@ import "../styles/global.css";
         <div class="navbar-links">
           <a class="navbar-link" href="/blog">Blog</a>
           <a class="navbar-link" href="/ctf">CTF</a>
+          <a class="navbar-link" href="/labs">Labs</a>
           <a class="navbar-link" href="/about">About</a>
+          {showDiscordInvite && (
+            <a class="navbar-link" href={discordInviteUrl!} target="_blank" rel="noopener noreferrer">Discord</a>
+          )}
         </div>
       </div>
     </nav>
@@ -36,11 +56,13 @@ import "../styles/global.css";
       <div class="container-page flex items-center justify-between">
         <p>&copy; {new Date().getFullYear()} SHART.CLOUD</p>
         <p>
-          <a class="mr-2" href="/privacy">Privacy</a>
-          <span class="opacity-40">|</span>
-          <a class="mx-2" href="/terms">Terms</a>
-          <span class="opacity-40">|</span>
-          <a class="ml-2" href="https://github.com/shart-cloud">GitHub</a>
+          <a class="hover:text-term-green-dark" href="https://github.com/shart-cloud">GitHub</a>
+          {showDiscordInvite && (
+            <>
+              <span class="mx-2 opacity-50">|</span>
+              <a class="hover:text-term-green-dark" href={discordInviteUrl!} target="_blank" rel="noopener noreferrer">Discord</a>
+            </>
+          )}
         </p>
       </div>
     </footer>

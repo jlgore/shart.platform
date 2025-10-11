@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "packId": "starter-vpc-cloudtrail",
+  "title": "Starter Pack: VPC Flow + CloudTrail",
+  "description": "Synthetic dataset mixing AWS VPC Flow Logs and CloudTrail for guided analysis.",
+  "createdAt": "2025-01-05T00:00:00.000Z",
+  "sizeBytes": 234567890,
+  "files": [
+    {
+      "path": "logs/vpc/part-0001.csv",
+      "format": "csv",
+      "source": "vpc_flow",
+      "schemaHint": "aws_vpc_flow_v5",
+      "timezone": "UTC"
+    },
+    {
+      "path": "logs/cloudtrail/2025-01-05.json.gz",
+      "format": "gz-json",
+      "source": "cloudtrail",
+      "schemaHint": "aws_cloudtrail_v1",
+      "timezone": "UTC"
+    },
+    {
+      "path": "logs/cloudtrail/2025-01-06.json.gz",
+      "format": "gz-json",
+      "source": "cloudtrail",
+      "schemaHint": "aws_cloudtrail_v1",
+      "timezone": "UTC"
+    }
+  ]
+}
+

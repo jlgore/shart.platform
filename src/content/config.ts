@@ -77,8 +77,58 @@ const ctfCollection = defineCollection({
   }),
 });
 
+// Labs collection for GitHub-based tutorials with branch progression
+const labsCollection = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    category: z.enum(['cloud-security', 'kubernetes', 'iam', 'ai', 'general']),
+    difficulty: z.enum(['beginner', 'intermediate', 'advanced']),
+    tags: z.array(z.string()).default([]),
+
+    // GitHub integration
+    githubRepo: z.string(), // e.g., 'shart-cloud/aws-iam-lab'
+
+    // Branch progression configuration
+    branchPattern: z.string().default('branch-{step}-*'), // pattern for branch discovery
+    totalSteps: z.number().optional(), // discovered at build time
+    stepTitles: z.array(z.string()).optional(), // custom step names
+
+    // Tutorial metadata
+    estimatedTime: z.number(), // minutes per step
+    prerequisites: z.array(z.string()).default([]),
+    learningObjectives: z.array(z.string()),
+
+    // Status and visibility
+    isActive: z.boolean().default(true),
+    draft: z.boolean().default(false),
+    publishedDate: z.coerce.date(),
+    lastUpdated: z.coerce.date().optional(),
+  }),
+});
+
 export const collections = {
   blog: blogCollection,
   bios: biosCollection,
   ctf: ctfCollection,
+  labs: labsCollection,
+  // Catalog of site-hosted log packs used in the Log Lab
+  logPacks: defineCollection({
+    type: 'content',
+    schema: z.object({
+      title: z.string(),
+      description: z.string(),
+      packId: z.string(), // e.g., 'starter-vpc-cloudtrail'
+      r2Key: z.string(), // key/path in R2 bucket, e.g., 'packs/starter-vpc-cloudtrail.tar.gz'
+      sha256: z.string().length(64), // lowercase hex digest for integrity check
+      sizeBytes: z.number(), // compressed size
+      sources: z.array(
+        z.enum(['vpc_flow', 'cloudtrail', 'alb', 'guardduty', 'cloudwatch', 'azure_activity', 'gcp_audit'])
+      ),
+      difficulty: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
+      tags: z.array(z.string()).default([]),
+      draft: z.boolean().default(false),
+    }),
+  }),
 };

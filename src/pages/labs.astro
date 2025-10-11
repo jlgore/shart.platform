@@ -1,0 +1,215 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const labs = await getCollection('labs', ({ data }) => data.draft !== true);
+
+// Sort by publishedDate, newest first
+const sortedLabs = labs.sort((a, b) =>
+  new Date(b.data.publishedDate).getTime() - new Date(a.data.publishedDate).getTime()
+);
+
+const categories = [...new Set(labs.map(lab => lab.data.category))].sort();
+const difficulties = ['beginner', 'intermediate', 'advanced'];
+---
+
+<BaseLayout
+  title="Security Labs"
+  description="Hands-on security labs covering cloud security, IAM, and infrastructure security topics."
+>
+  <main class="container mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-4">Security Labs</h1>
+      <p class="text-lg text-gray-300">
+        Hands-on security labs with step-by-step tutorials hosted on GitHub.
+        Each lab includes progressive branches to guide you through the learning process.
+      </p>
+    </header>
+
+    <!-- Filters -->
+    <section class="mb-8">
+      <div class="flex flex-wrap gap-4 items-center">
+        <div class="flex flex-wrap gap-2">
+          <span class="text-sm text-gray-400">Filter by:</span>
+          {categories.map(category => (
+            <button
+              class="px-3 py-1 text-xs border border-term-green/50 rounded hover:bg-term-green/10 transition-colors"
+              data-filter="category"
+              data-value={category}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {difficulties.map(difficulty => (
+            <button
+              class="px-3 py-1 text-xs border border-amber-500/50 rounded hover:bg-amber-500/10 transition-colors"
+              data-filter="difficulty"
+              data-value={difficulty}
+            >
+              {difficulty}
+            </button>
+          ))}
+        </div>
+        <button
+          class="px-3 py-1 text-xs border border-gray-500/50 rounded hover:bg-gray-500/10 transition-colors"
+          id="clear-filters"
+        >
+          Clear All
+        </button>
+      </div>
+    </section>
+
+    <!-- Labs Grid -->
+    <section class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {sortedLabs.map(lab => {
+        const publishDate = lab.data.publishedDate.toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+
+        return (
+          <article
+            class="lab-card border border-term-green/40 rounded-lg p-6 hover:border-term-green/60 transition-colors"
+            data-category={lab.data.category}
+            data-difficulty={lab.data.difficulty}
+          >
+            <header class="mb-4">
+              <h2 class="text-xl font-semibold mb-2">
+                <a href={`/labs/${lab.slug}`} class="hover:text-term-green-dark">
+                  {lab.data.title}
+                </a>
+              </h2>
+              <p class="text-gray-300 text-sm mb-3">{lab.data.description}</p>
+
+              <div class="flex items-center gap-2 text-xs mb-2">
+                <span class="px-2 py-1 border border-term-green/50 rounded uppercase">
+                  {lab.data.category}
+                </span>
+                <span class="px-2 py-1 border border-amber-500/50 rounded uppercase text-amber-400">
+                  {lab.data.difficulty}
+                </span>
+                <span class="px-2 py-1 border border-blue-500/50 rounded text-blue-400">
+                  {lab.data.estimatedTime}min
+                </span>
+              </div>
+            </header>
+
+            <div class="mb-4">
+              <div class="text-xs text-gray-400 mb-2">Learning Objectives:</div>
+              <ul class="text-sm space-y-1">
+                {lab.data.learningObjectives.slice(0, 3).map(objective => (
+                  <li class="text-gray-300">• {objective}</li>
+                ))}
+                {lab.data.learningObjectives.length > 3 && (
+                  <li class="text-gray-400">• +{lab.data.learningObjectives.length - 3} more...</li>
+                )}
+              </ul>
+            </div>
+
+            {lab.data.tags.length > 0 && (
+              <div class="mb-4">
+                <div class="flex flex-wrap gap-1">
+                  {lab.data.tags.slice(0, 4).map(tag => (
+                    <span class="px-2 py-0.5 text-xs border border-gray-500/40 rounded">
+                      #{tag}
+                    </span>
+                  ))}
+                  {lab.data.tags.length > 4 && (
+                    <span class="px-2 py-0.5 text-xs text-gray-400">
+                      +{lab.data.tags.length - 4}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <footer class="flex items-center justify-between text-xs text-gray-400">
+              <div class="flex items-center gap-2">
+                <a
+                  href={`https://github.com/${lab.data.githubRepo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:text-term-green-dark"
+                >
+                  📁 Repository
+                </a>
+              </div>
+              <time datetime={lab.data.publishedDate.toISOString()}>
+                {publishDate}
+              </time>
+            </footer>
+          </article>
+        );
+      })}
+    </section>
+
+    {sortedLabs.length === 0 && (
+      <div class="text-center py-12">
+        <p class="text-gray-400">No labs available yet. Check back soon!</p>
+      </div>
+    )}
+  </main>
+
+  <script>
+    // Simple client-side filtering
+    document.addEventListener('DOMContentLoaded', () => {
+      const filterButtons = document.querySelectorAll('[data-filter]');
+      const clearButton = document.getElementById('clear-filters');
+      const labCards = document.querySelectorAll('.lab-card');
+
+      let activeFilters = {
+        category: new Set(),
+        difficulty: new Set()
+      };
+
+      function updateDisplay() {
+        labCards.forEach(card => {
+          const category = card.getAttribute('data-category');
+          const difficulty = card.getAttribute('data-difficulty');
+
+          const categoryMatch = activeFilters.category.size === 0 || activeFilters.category.has(category);
+          const difficultyMatch = activeFilters.difficulty.size === 0 || activeFilters.difficulty.has(difficulty);
+
+          if (categoryMatch && difficultyMatch) {
+            card.style.display = 'block';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      }
+
+      filterButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const filterType = button.getAttribute('data-filter');
+          const value = button.getAttribute('data-value');
+
+          if (activeFilters[filterType].has(value)) {
+            activeFilters[filterType].delete(value);
+            button.classList.remove('bg-term-green/20', 'bg-amber-500/20');
+          } else {
+            activeFilters[filterType].add(value);
+            if (filterType === 'category') {
+              button.classList.add('bg-term-green/20');
+            } else {
+              button.classList.add('bg-amber-500/20');
+            }
+          }
+
+          updateDisplay();
+        });
+      });
+
+      clearButton?.addEventListener('click', () => {
+        activeFilters.category.clear();
+        activeFilters.difficulty.clear();
+
+        filterButtons.forEach(button => {
+          button.classList.remove('bg-term-green/20', 'bg-amber-500/20');
+        });
+
+        updateDisplay();
+      });
+    });
+  </script>
+</BaseLayout>

@@ -1,0 +1,120 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+
+export interface Props {
+  limit?: number;
+  include?: Array<'blog' | 'labs' | 'ctf'>;
+}
+
+const { limit = 6, include = ['blog', 'labs'] } = Astro.props as Props;
+
+type ActivityItem = {
+  type: 'blog' | 'lab' | 'ctf';
+  title: string;
+  href: string;
+  date: Date;
+  timestamp: number;
+  external?: boolean;
+};
+
+const items: ActivityItem[] = [];
+
+function normalizeContentDate(input: Date): { date: Date; timestamp: number } {
+  // Treat frontmatter dates as date-only by normalizing to noon UTC
+  // to avoid TZ-induced off-by-one shifts in display and sort.
+  const y = input.getUTCFullYear();
+  const m = input.getUTCMonth();
+  const d = input.getUTCDate();
+  const normalized = new Date(Date.UTC(y, m, d, 12, 0, 0));
+  return { date: normalized, timestamp: normalized.getTime() };
+}
+
+if (include.includes('blog')) {
+  const posts = await getCollection('blog', ({ data }) => data.draft !== true);
+  const blogItems = posts.map((post) => {
+    const { date, timestamp } = normalizeContentDate(new Date(post.data.date));
+    const isLinkPost = post.data.isLinkPost === true && typeof post.data.externalLink === 'string';
+    const href = isLinkPost ? post.data.externalLink! : `/blog/${post.slug}`;
+    return {
+      type: 'blog' as const,
+      title: post.data.title,
+      href,
+      date,
+      timestamp,
+      external: isLinkPost || undefined,
+    } satisfies ActivityItem;
+  });
+  items.push(...blogItems);
+}
+
+if (include.includes('labs')) {
+  const labs = await getCollection('labs', ({ data }) => data.draft !== true && data.isActive !== false);
+  const labItems = labs.map((lab) => {
+    const chosenDate = lab.data.lastUpdated ?? lab.data.publishedDate;
+    const { date, timestamp } = normalizeContentDate(new Date(chosenDate));
+    return {
+      type: 'lab' as const,
+      title: lab.data.title,
+      href: `/labs/${lab.slug}`,
+      date,
+      timestamp,
+    } satisfies ActivityItem;
+  });
+  items.push(...labItems);
+}
+
+if (include.includes('ctf')) {
+  const ctf = await getCollection('ctf', ({ data }) => data.draft !== true && data.isReleased === true);
+  const ctfItems = ctf.map((challenge) => {
+    const { date, timestamp } = normalizeContentDate(new Date(challenge.data.launchDate));
+    return {
+      type: 'ctf' as const,
+      title: challenge.data.title,
+      href: `/ctf/${challenge.slug}`,
+      date,
+      timestamp,
+    } satisfies ActivityItem;
+  });
+  items.push(...ctfItems);
+}
+
+const latestActivity = items
+  .filter((i) => Number.isFinite(i.timestamp))
+  .sort((a, b) => b.timestamp - a.timestamp)
+  .slice(0, limit);
+---
+
+<section class="terminal-window">
+  <h2 class="text-xl font-bold mb-4">Latest Activity</h2>
+
+  {latestActivity.length === 0 ? (
+    <p class="text-sm opacity-80">No recent activity yet.</p>
+  ) : (
+    <ul class="space-y-2">
+      {latestActivity.map((item) => (
+        <li class="flex items-center justify-between">
+          <a class="hover:text-term-green-dark" href={item.href} target={item.external ? '_blank' : undefined} rel={item.external ? 'noopener noreferrer' : undefined}>
+            {item.type === 'lab' ? '[Lab] ' : item.type === 'ctf' ? '[CTF] ' : '[Blog] '} {item.title}
+            {item.external ? ' ↗' : ''}
+          </a>
+          <span class="text-xs text-term-green/70">
+            {item.date.toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+              timeZone: 'UTC'
+            })}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )}
+
+  <p class="mt-4 text-sm flex gap-4">
+    <a class="hover:text-term-green-dark" href="/blog">View all posts →</a>
+    <a class="hover:text-term-green-dark" href="/labs">View all labs →</a>
+    {include.includes('ctf') && (
+      <a class="hover:text-term-green-dark" href="/ctf">View all CTFs →</a>
+    )}
+  </p>
+</section>

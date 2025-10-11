@@ -1,0 +1,226 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LabStepNavigation from '../../components/LabStepNavigation.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('labs', ({ data }) => data.draft !== true);
+  return entries.map((entry) => ({
+    params: { slug: entry.slug },
+    props: entry,
+  }));
+}
+
+type Props = CollectionEntry<'labs'>;
+
+const lab = Astro.props as Props;
+const { Content } = await lab.render();
+
+const publishDate = lab.data.publishedDate.toLocaleDateString(undefined, {
+  year: 'numeric', month: 'long', day: 'numeric'
+});
+
+// For now, we'll simulate the branch data. In a real implementation,
+// this would come from the GitHub API during build time
+const simulatedSteps = [
+  { stepNumber: 1, branchName: 'branch-1-vulnerable', title: 'Vulnerable Setup' },
+  { stepNumber: 2, branchName: 'branch-2-vpc-conditional', title: 'VPC Conditional' },
+  { stepNumber: 3, branchName: 'branch-3-vpc-endpoint', title: 'VPC Endpoint' },
+  { stepNumber: 4, branchName: 'branch-4-file-upload', title: 'File Upload' },
+  { stepNumber: 5, branchName: 'branch-5-network-segmentation', title: 'Network Segmentation' }
+];
+
+const currentStep = 1; // This would come from URL params or progress tracking
+---
+
+<BaseLayout title={lab.data.title} description={lab.data.description}>
+  <main class="container mx-auto px-4 py-8">
+    <!-- Lab Header -->
+    <header class="mb-8">
+      <div class="flex items-center gap-2 text-sm text-gray-400 mb-2">
+        <a href="/labs" class="hover:text-term-green-dark">Labs</a>
+        <span>→</span>
+        <span>{lab.data.title}</span>
+      </div>
+
+      <h1 class="text-3xl font-bold mb-4">{lab.data.title}</h1>
+
+      <div class="border border-term-green/40 rounded-lg p-6 mb-6">
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Lab Info -->
+          <div>
+            <p class="text-lg text-gray-300 mb-4">{lab.data.description}</p>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+              <span class="px-3 py-1 border border-term-green/50 rounded uppercase text-sm">
+                {lab.data.category}
+              </span>
+              <span class="px-3 py-1 border border-amber-500/50 rounded uppercase text-sm text-amber-400">
+                {lab.data.difficulty}
+              </span>
+              <span class="px-3 py-1 border border-blue-500/50 rounded text-sm text-blue-400">
+                ~{lab.data.estimatedTime} minutes
+              </span>
+            </div>
+
+            {lab.data.tags.length > 0 && (
+              <div class="flex flex-wrap gap-1">
+                {lab.data.tags.map(tag => (
+                  <span class="px-2 py-1 text-xs border border-gray-500/40 rounded">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <!-- Lab Meta -->
+          <div class="space-y-4">
+            {lab.data.prerequisites.length > 0 && (
+              <div>
+                <h3 class="font-semibold text-term-green mb-2">Prerequisites</h3>
+                <ul class="text-sm space-y-1">
+                  {lab.data.prerequisites.map(prereq => (
+                    <li class="text-gray-300">• {prereq}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <h3 class="font-semibold text-term-green mb-2">Learning Objectives</h3>
+              <ul class="text-sm space-y-1">
+                {lab.data.learningObjectives.map(objective => (
+                  <li class="text-gray-300">• {objective}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div class="flex items-center gap-4 text-sm text-gray-400">
+              <a
+                href={`https://github.com/${lab.data.githubRepo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-term-green-dark flex items-center gap-1"
+              >
+                📁 Repository ↗
+              </a>
+              <span>Published {publishDate}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Step Navigation -->
+    <LabStepNavigation
+      labSlug={lab.slug}
+      currentStep={currentStep}
+      totalSteps={simulatedSteps.length}
+      steps={simulatedSteps}
+    />
+
+    <!-- Lab Content -->
+    <section class="prose prose-invert max-w-none mb-8">
+      <Content />
+    </section>
+
+    <!-- Lab Actions -->
+    <footer class="border-t border-gray-700 pt-6">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-4">
+          <a
+            href={`https://github.com/${lab.data.githubRepo}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-4 py-2 border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors"
+          >
+            Open in GitHub ↗
+          </a>
+          <button
+            id="clone-repo"
+            class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+          >
+            📋 Copy Clone Command
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            id="share-lab"
+            class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+            title="Share this lab"
+          >
+            🔗 Share
+          </button>
+          <a
+            href="/labs"
+            class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+          >
+            ← Back to Labs
+          </a>
+        </div>
+      </div>
+
+      <!-- Clone Command -->
+      <div class="mt-4 p-4 bg-gray-800 rounded-lg hidden" id="clone-command-container">
+        <div class="flex items-center justify-between">
+          <code class="font-mono text-sm">git clone https://github.com/{lab.data.githubRepo}.git</code>
+          <button
+            id="copy-clone"
+            class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Clone repository button
+      const cloneButton = document.getElementById('clone-repo');
+      const cloneContainer = document.getElementById('clone-command-container');
+      const copyCloneButton = document.getElementById('copy-clone');
+
+      cloneButton?.addEventListener('click', () => {
+        cloneContainer?.classList.toggle('hidden');
+      });
+
+      copyCloneButton?.addEventListener('click', () => {
+        const command = cloneContainer?.querySelector('code')?.textContent;
+        if (command) {
+          navigator.clipboard.writeText(command).then(() => {
+            const original = copyCloneButton.textContent;
+            copyCloneButton.textContent = 'Copied!';
+            setTimeout(() => {
+              copyCloneButton.textContent = original;
+            }, 2000);
+          });
+        }
+      });
+
+      // Share button
+      document.getElementById('share-lab')?.addEventListener('click', () => {
+        if (navigator.share) {
+          navigator.share({
+            title: document.title,
+            url: window.location.href
+          });
+        } else {
+          navigator.clipboard.writeText(window.location.href).then(() => {
+            const button = document.getElementById('share-lab');
+            if (button) {
+              const original = button.textContent;
+              button.textContent = '✓ Link Copied!';
+              setTimeout(() => {
+                button.textContent = original;
+              }, 2000);
+            }
+          });
+        }
+      });
+    });
+  </script>
+</BaseLayout>

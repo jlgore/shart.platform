@@ -1,11 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* Fonts */
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/700.css';
 @import '@fontsource/orbitron/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   html { scroll-behavior: smooth; }
@@ -36,6 +36,18 @@
   .ascii-art { @apply select-none; }
 
   .footer { @apply border-t border-term-green/40 py-6 mt-16 text-sm text-term-green/80; }
+
+  /* With @tailwindcss/typography installed, use `.prose` for README */
+  /* Optional small tweaks for dark theme */
+  .prose :where(a):not(:where([class~="not-prose"] *)) {
+    @apply text-term-green underline underline-offset-4 decoration-dotted hover:text-term-green-dark;
+  }
+  .prose :where(code):not(:where([class~="not-prose"] *)) {
+    @apply text-term-green;
+  }
+  .prose :where(pre):not(:where([class~="not-prose"] *)) {
+    @apply bg-black border border-term-green/30;
+  }
 }
 
 @layer utilities {

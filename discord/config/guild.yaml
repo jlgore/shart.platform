@@ -1,0 +1,71 @@
+name: shart.cloud Community
+pruneExtraneous: false
+
+roles:
+  - name: Admins
+    color: "#E91E63"
+    hoist: true
+    mentionable: false
+    permissions:
+      - Administrator
+    position: 2
+  - name: Moderators
+    color: "#9C27B0"
+    hoist: true
+    mentionable: true
+    permissions:
+      - ManageChannels
+      - ManageMessages
+      - KickMembers
+      - BanMembers
+    position: 3
+  - name: Members
+    color: "#03A9F4"
+    mentionable: true
+    permissions: []
+    position: 4
+
+channels:
+  - type: category
+    name: releases
+    position: 1
+    overwrites:
+      - role: Members
+        allow: [ ViewChannel, ReadMessageHistory ]
+    channels:
+      - type: text
+        name: welcome
+        topic: "Welcome to shart.cloud — mind the blast radius."
+        rateLimitPerUser: 0
+      - type: text
+        name: rules
+        topic: "Introduce yourself"
+
+  - type: category
+    name: general
+    position: 2
+    channels:
+      - type: text
+        name: lobby
+        topic: "Grab a seat and talk shop."
+        overwrites:
+          - role: Moderators
+            allow: [ ManageMessages ]
+      - type: voice
+        name: voice-1
+        userLimit: 10
+
+  - type: category
+    name: ctf
+    position: 3
+    channels:
+      - type: text
+        name: challenge-chat
+        topic: "Hints? Maybe. Brute force? Rate limited."
+      - type: text
+        name: writeups
+        topic: "Share your flags (redact the good bits)."
+      - type: voice
+        name: ctf-war-room
+        userLimit: 0
+

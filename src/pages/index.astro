@@ -1,14 +1,21 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCollection } from 'astro:content';
-
-const allPosts = await getCollection('blog', ({ data }) => {
-  return data.draft !== true;
-});
-
-const latestPosts = allPosts
-  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
-  .slice(0, 3);
+import AlertBox from '../components/AlertBox.astro';
+import LatestActivity from '../components/LatestActivity.astro';
+// Server-only/build-time: determine whether to show Discord invite
+const discordInviteEnabled = String((import.meta as any)?.env?.DISCORD_SERVER_INVITE ?? "")
+  .toLowerCase()
+  .trim() === "true";
+const discordInviteUrl: string | undefined = (() => {
+  try {
+    const fromImport = (import.meta as any)?.env?.DISCORD_INVITE_URL as string | undefined;
+    const fromProcess = typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
+    return fromImport || fromProcess;
+  } catch {
+    return typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
+  }
+})();
+const showDiscordInvite = discordInviteEnabled && !!discordInviteUrl;
 ---
 
 <BaseLayout title="Home">
@@ -18,32 +25,18 @@ const latestPosts = allPosts
 
     <div class="mt-4 flex gap-4 text-sm">
       <a class="navbar-link" href="/ctf">CTFs</a>
+      <a class="navbar-link" href="/labs">Labs</a>
       <a class="navbar-link" href="/blog">Blog</a>
     </div>
   </section>
 
-  {latestPosts.length > 0 && (
-    <section class="terminal-window">
-      <h2 class="text-xl font-bold mb-4">Recent Posts</h2>
-
-      <ul class="space-y-2">
-        {latestPosts.map((post) => (
-          <li class="flex items-center justify-between">
-            <a class="hover:text-term-green-dark" href={`/blog/${post.slug}`}>
-              {post.data.title}
-            </a>
-            <span class="text-xs text-term-green/70">
-              {new Date(post.data.date).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <p class="mt-4 text-sm"><a class="hover:text-term-green-dark" href="/blog">View all posts →</a></p>
-    </section>
+  {!showDiscordInvite && (
+    <div class="mb-10">
+      <AlertBox variant="warning" title="Heads up" class="shadow-md">
+        Discord server coming soon?
+      </AlertBox>
+    </div>
   )}
+
+  <LatestActivity limit={6} include={["blog", "labs"]} />
 </BaseLayout>

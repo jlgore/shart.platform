@@ -1,0 +1,317 @@
+---
+export interface Props {
+  labSlug: string;
+  currentStep: number;
+  totalSteps: number;
+  steps?: Array<{
+    stepNumber: number;
+    branchName: string;
+    title?: string;
+  }>;
+}
+
+const { labSlug, currentStep, totalSteps, steps } = Astro.props;
+
+// Generate step data if not provided
+const stepData = steps || Array.from({ length: totalSteps }, (_, i) => ({
+  stepNumber: i + 1,
+  branchName: `branch-${i + 1}`,
+  title: `Step ${i + 1}`
+}));
+---
+
+<nav class="lab-step-navigation mb-8" data-lab-slug={labSlug} data-total-steps={totalSteps}>
+  <!-- Progress Bar -->
+  <div class="mb-6">
+    <div class="flex items-center justify-between text-sm mb-2">
+      <span class="text-gray-400">Progress</span>
+      <span class="text-term-green" id="progress-text">Step {currentStep} of {totalSteps}</span>
+    </div>
+    <div class="w-full bg-gray-700 rounded-full h-2">
+      <div
+        class="bg-term-green h-2 rounded-full transition-all duration-300"
+        style={`width: ${Math.round((currentStep / totalSteps) * 100)}%`}
+        id="progress-bar"
+      ></div>
+    </div>
+    <div class="text-xs text-gray-400 mt-1">
+      <span id="completion-percentage">{Math.round((currentStep / totalSteps) * 100)}%</span> Complete
+    </div>
+  </div>
+
+  <!-- Step Navigation -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+    {stepData.map((step) => {
+      const isCurrent = step.stepNumber === currentStep;
+      const isCompleted = step.stepNumber < currentStep;
+      const isLocked = step.stepNumber > currentStep;
+
+      const statusIcon = isCompleted ? '✓' : isCurrent ? '●' : '○';
+      const statusText = isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Locked';
+
+      const baseClasses = 'step-item p-3 border rounded-lg text-sm transition-all duration-200';
+      const statusClasses = isCompleted
+        ? 'border-term-green/60 bg-term-green/10 text-term-green cursor-pointer hover:bg-term-green/20'
+        : isCurrent
+          ? 'border-term-green bg-term-green/20 text-term-green'
+          : 'border-gray-600 text-gray-400 cursor-not-allowed';
+
+      return (
+        <div
+          class={`${baseClasses} ${statusClasses}`}
+          data-step={step.stepNumber}
+          data-branch={step.branchName}
+          data-status={statusText.toLowerCase()}
+          role="button"
+          tabindex={isLocked ? -1 : 0}
+          aria-disabled={isLocked}
+        >
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-xs">{statusIcon}</span>
+            <span class="font-semibold">Step {step.stepNumber}</span>
+          </div>
+          <div class="text-xs opacity-80">
+            {step.title || `Branch ${step.stepNumber}`}
+          </div>
+          <div class="text-xs opacity-60 mt-1">
+            {statusText}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="flex gap-2">
+      <button
+        id="prev-step"
+        class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={currentStep <= 1}
+      >
+        ← Previous Step
+      </button>
+      <button
+        id="next-step"
+        class="px-4 py-2 border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={currentStep >= totalSteps}
+      >
+        Next Step →
+      </button>
+    </div>
+
+    <div class="flex gap-2">
+      <button
+        id="mark-complete"
+        class="px-4 py-2 bg-term-green/20 border border-term-green/60 text-term-green rounded hover:bg-term-green/30 transition-colors"
+      >
+        Mark Complete
+      </button>
+      <button
+        id="reset-progress"
+        class="px-3 py-2 border border-red-500/60 text-red-400 rounded hover:bg-red-500/10 transition-colors text-sm"
+        title="Reset lab progress"
+      >
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- Current Step Info -->
+  <div class="mt-6 p-4 border border-term-green/30 rounded-lg bg-term-green/5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-term-green">
+        Current Step: {stepData.find(s => s.stepNumber === currentStep)?.title || `Step ${currentStep}`}
+      </h3>
+      <div class="text-sm text-gray-400">
+        Branch: <code class="font-mono text-term-green">{stepData.find(s => s.stepNumber === currentStep)?.branchName}</code>
+      </div>
+    </div>
+
+    <div class="text-sm text-gray-300 mb-3">
+      Switch to this step's branch to follow along with the tutorial:
+    </div>
+
+    <div class="flex items-center gap-2">
+      <code class="flex-1 p-2 bg-gray-800 rounded font-mono text-sm" id="git-command">
+        git checkout {stepData.find(s => s.stepNumber === currentStep)?.branchName}
+      </code>
+      <button
+        id="copy-git-command"
+        class="px-3 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors text-sm"
+        title="Copy git command"
+      >
+        📋 Copy
+      </button>
+    </div>
+  </div>
+</nav>
+
+<script>
+  import { labProgress } from '../lib/lab-progress.ts';
+
+  class LabStepNavigation {
+    private labSlug: string;
+    private totalSteps: number;
+    private progressManager = labProgress;
+
+    constructor() {
+      const nav = document.querySelector('.lab-step-navigation') as HTMLElement;
+      if (!nav) return;
+
+      this.labSlug = nav.dataset.labSlug!;
+      this.totalSteps = parseInt(nav.dataset.totalSteps!);
+
+      this.initializeProgress();
+      this.bindEvents();
+      this.updateUI();
+    }
+
+    private initializeProgress() {
+      this.progressManager.initializeProgress(this.labSlug, this.totalSteps);
+    }
+
+    private bindEvents() {
+      // Step navigation
+      document.querySelectorAll('.step-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          const target = e.currentTarget as HTMLElement;
+          const step = parseInt(target.dataset.step!);
+          const status = target.dataset.status;
+
+          if (status !== 'locked') {
+            this.goToStep(step);
+          }
+        });
+      });
+
+      // Action buttons
+      document.getElementById('prev-step')?.addEventListener('click', () => {
+        const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
+        if (current > 1) {
+          this.goToStep(current - 1);
+        }
+      });
+
+      document.getElementById('next-step')?.addEventListener('click', () => {
+        const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
+        if (current < this.totalSteps) {
+          this.goToStep(current + 1);
+        }
+      });
+
+      document.getElementById('mark-complete')?.addEventListener('click', () => {
+        const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
+        this.progressManager.markStepComplete(this.labSlug, current);
+        this.updateUI();
+      });
+
+      document.getElementById('reset-progress')?.addEventListener('click', () => {
+        if (confirm('Are you sure you want to reset your progress for this lab?')) {
+          this.progressManager.resetProgress(this.labSlug);
+          this.initializeProgress();
+          this.updateUI();
+          window.location.reload(); // Refresh to reset to step 1
+        }
+      });
+
+      // Copy git command
+      document.getElementById('copy-git-command')?.addEventListener('click', () => {
+        const command = document.getElementById('git-command')?.textContent;
+        if (command) {
+          navigator.clipboard.writeText(command.trim()).then(() => {
+            const button = document.getElementById('copy-git-command');
+            if (button) {
+              const original = button.textContent;
+              button.textContent = '✓ Copied!';
+              setTimeout(() => {
+                button.textContent = original;
+              }, 2000);
+            }
+          });
+        }
+      });
+    }
+
+    private goToStep(step: number) {
+      this.progressManager.setCurrentStep(this.labSlug, step);
+      window.location.href = `/labs/${this.labSlug}/step/${step}`;
+    }
+
+    private updateUI() {
+      const progress = this.progressManager.getProgress(this.labSlug);
+      if (!progress) return;
+
+      // Update progress bar
+      const percentage = this.progressManager.getProgressPercentage(this.labSlug);
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-text');
+      const completionPercentage = document.getElementById('completion-percentage');
+
+      if (progressBar) {
+        progressBar.style.width = `${percentage}%`;
+      }
+      if (progressText) {
+        progressText.textContent = `Step ${progress.currentStep} of ${this.totalSteps}`;
+      }
+      if (completionPercentage) {
+        completionPercentage.textContent = `${percentage}%`;
+      }
+
+      // Update step items
+      document.querySelectorAll('.step-item').forEach(item => {
+        const stepNum = parseInt((item as HTMLElement).dataset.step!);
+        const isCompleted = progress.completedSteps.includes(stepNum);
+        const isCurrent = progress.currentStep === stepNum;
+        const isLocked = stepNum > progress.currentStep && !isCompleted;
+
+        // Update classes
+        item.className = item.className.replace(/border-\w+[-\/]\w+/g, '').replace(/bg-\w+[-\/]\w+/g, '').replace(/text-\w+[-\/]?\w*/g, '');
+
+        const baseClasses = 'step-item p-3 border rounded-lg text-sm transition-all duration-200';
+        let statusClasses = '';
+
+        if (isCompleted) {
+          statusClasses = 'border-term-green/60 bg-term-green/10 text-term-green cursor-pointer hover:bg-term-green/20';
+        } else if (isCurrent) {
+          statusClasses = 'border-term-green bg-term-green/20 text-term-green';
+        } else {
+          statusClasses = 'border-gray-600 text-gray-400 cursor-not-allowed';
+        }
+
+        item.className = `${baseClasses} ${statusClasses}`;
+
+        // Update status icon and text
+        const statusIcon = item.querySelector('.font-mono');
+        const statusText = item.querySelector('.opacity-60');
+
+        if (statusIcon) {
+          statusIcon.textContent = isCompleted ? '✓' : isCurrent ? '●' : '○';
+        }
+        if (statusText) {
+          statusText.textContent = isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Locked';
+        }
+
+        // Update accessibility
+        item.setAttribute('aria-disabled', isLocked.toString());
+        item.setAttribute('tabindex', isLocked ? '-1' : '0');
+      });
+
+      // Update button states
+      const prevButton = document.getElementById('prev-step') as HTMLButtonElement;
+      const nextButton = document.getElementById('next-step') as HTMLButtonElement;
+
+      if (prevButton) {
+        prevButton.disabled = progress.currentStep <= 1;
+      }
+      if (nextButton) {
+        nextButton.disabled = progress.currentStep >= this.totalSteps;
+      }
+    }
+  }
+
+  // Initialize when DOM is loaded
+  document.addEventListener('DOMContentLoaded', () => {
+    new LabStepNavigation();
+  });
+</script>

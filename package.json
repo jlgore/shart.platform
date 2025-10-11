@@ -11,21 +11,31 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.4",
     "@astrojs/cloudflare": "^12.6.9",
     "@astrojs/mdx": "^4.3.6",
     "@astrojs/react": "^4.3.1",
     "@astrojs/rss": "^4.0.12",
     "@astrojs/tailwind": "^6.0.2",
+    "@duckdb/duckdb-wasm": "^1.29.0",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/orbitron": "^5.2.8",
+    "@monaco-editor/react": "^4.6.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "@tailwindcss/typography": "^0.5.19",
     "astro": "^5.14.1",
     "d3": "^7.9.0",
+    "fflate": "^0.8.2",
+    "monaco-editor": "^0.52.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",
-    "vitest": "^2.1.4"
+    "vitest": "^2.1.4",
+    "wrangler": "^4.42.0"
   }
 }

@@ -1,0 +1,19 @@
+---
+title: Starter Pack — VPC Flow + CloudTrail
+description: Synthetic dataset mixing AWS VPC Flow Logs and CloudTrail for guided analysis in the Log Lab.
+packId: starter-vpc-cloudtrail
+r2Key: packs/starter-vpc-cloudtrail.tar.gz
+sha256: 06be90ebb23ac15d0be126a383ba0e0e6642f29e129ba1a1c3cab58467bbb689
+sizeBytes: 1075
+sources: ["vpc_flow", "cloudtrail"]
+difficulty: beginner
+tags: ["aws", "network", "audit", "training"]
+draft: false
+---
+
+This pack is used in the Log Lab to demonstrate network and audit log investigation. It contains:
+
+- AWS VPC Flow Logs (CSV)
+- AWS CloudTrail events (GZIP-compressed JSON)
+
+Use the SIEM view for quick wins or the SQL editor to dig deeper.

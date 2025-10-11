@@ -1,0 +1,258 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import LabStepNavigation from '../../../../components/LabStepNavigation.astro';
+import { GitHubBranchDiscovery, GitHubREADMEFetcher } from '../../../../lib/github/index.js';
+import { sanitizeHtml } from '../../../../lib/sanitize-html.js';
+
+export async function getStaticPaths() {
+  const labs = await getCollection('labs', ({ data }) => data.draft !== true);
+
+  const paths: any[] = [];
+
+  for (const lab of labs) {
+    try {
+      const token = (import.meta as any).env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+      const api = new GitHubBranchDiscovery({ token });
+      const readme = new GitHubREADMEFetcher({ token });
+
+      // Fetch branches then compute steps by pattern
+      const pattern = lab.data.branchPattern || 'branch-{step}-*';
+      const branches = await api.fetchAllBranches(lab.data.githubRepo);
+      const stepBranches = branches
+        .filter(b => api.matchesPattern(b.name, pattern))
+        .map(b => ({
+          stepNumber: api.extractStepNumber(b.name, pattern)!,
+          branchName: b.name
+        }))
+        .sort((a, b) => a.stepNumber - b.stepNumber);
+
+      const toTitle = (branchName: string) =>
+        branchName.replace(/^branch-\d+-/, '').replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+
+      for (const step of stepBranches) {
+        let readmeHtml = '';
+        try {
+          const raw = await readme.fetchREADMEHtml(lab.data.githubRepo, step.branchName);
+          readmeHtml = await sanitizeHtml(raw);
+        } catch (e) {
+          readmeHtml = `<div class=\"prose prose-invert\"><p><em>Unable to load README for ${step.branchName}.</em></p></div>`;
+        }
+
+        paths.push({
+          params: { slug: lab.slug, stepNumber: String(step.stepNumber) },
+          props: {
+            lab,
+            stepNumber: step.stepNumber,
+            totalSteps: stepBranches.length,
+            steps: stepBranches.map(s => ({ stepNumber: s.stepNumber, branchName: s.branchName, title: toTitle(s.branchName) })),
+            readmeHtml,
+            currentBranchName: step.branchName,
+            currentTitle: toTitle(step.branchName)
+          }
+        });
+      }
+    } catch (err) {
+      const fallbackSteps = [
+        { stepNumber: 1, branchName: 'branch-1-vulnerable', title: 'Vulnerable Setup' },
+        { stepNumber: 2, branchName: 'branch-2-vpc-conditional', title: 'VPC Conditional' },
+        { stepNumber: 3, branchName: 'branch-3-vpc-endpoint', title: 'VPC Endpoint' },
+        { stepNumber: 4, branchName: 'branch-4-file-upload', title: 'File Upload' },
+        { stepNumber: 5, branchName: 'branch-5-network-segmentation', title: 'Network Segmentation' }
+      ];
+
+      for (const step of fallbackSteps) {
+        paths.push({
+          params: { slug: lab.slug, stepNumber: String(step.stepNumber) },
+          props: {
+            lab,
+            stepNumber: step.stepNumber,
+            totalSteps: fallbackSteps.length,
+            steps: fallbackSteps,
+            readmeHtml: await sanitizeHtml('<div class="prose prose-invert"><p><em>README content will appear here once GitHub API access is available during build.</em></p></div>'),
+            currentBranchName: step.branchName,
+            currentTitle: step.title
+          }
+        });
+      }
+    }
+  }
+
+  return paths;
+}
+
+interface Props {
+  lab: CollectionEntry<'labs'>;
+  stepNumber: number;
+  totalSteps: number;
+  steps: { stepNumber: number; branchName: string; title: string }[];
+  readmeHtml: string;
+  currentBranchName: string;
+  currentTitle: string;
+}
+
+const { lab, stepNumber, totalSteps, steps, readmeHtml, currentBranchName, currentTitle } = Astro.props as Props;
+
+const currentStepData = { branchName: currentBranchName, title: currentTitle };
+const allSteps = steps.map(s => ({ stepNumber: s.stepNumber, branchName: s.branchName, title: s.title }));
+
+const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
+---
+
+<BaseLayout title={pageTitle} description={`${lab.data.description} - Step ${stepNumber}: ${currentStepData.title}`}>
+  <main class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <a href="/labs" class="hover:text-term-green-dark">Labs</a>
+      <span>→</span>
+      <a href={`/labs/${lab.slug}`} class="hover:text-term-green-dark">{lab.data.title}</a>
+      <span>→</span>
+      <span>Step {stepNumber}</span>
+    </nav>
+
+    <!-- Lab Header -->
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">{lab.data.title}</h1>
+      <h2 class="text-xl text-term-green mb-4">Step {stepNumber}: {currentStepData.title}</h2>
+
+      <div class="flex items-center gap-4 text-sm text-gray-400">
+        <span>Branch: <code class="font-mono text-term-green">{currentStepData.branchName}</code></span>
+        <a
+          href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-term-green-dark"
+        >
+          View on GitHub ↗
+        </a>
+      </div>
+    </header>
+
+    <!-- Step Navigation -->
+    <LabStepNavigation
+      labSlug={lab.slug}
+      currentStep={stepNumber}
+      totalSteps={totalSteps}
+      steps={allSteps}
+    />
+
+    <!-- Step Content -->
+    <article class="mb-8">
+      <div class="border border-term-green/30 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-semibold mb-4">Step {stepNumber}: {currentStepData.title}</h3>
+
+        <!-- Render README content from GitHub as HTML -->
+        <div class="prose prose-invert max-w-none" set:html={readmeHtml} />
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="border border-gray-600 rounded-lg p-4">
+          <h4 class="font-semibold mb-2">Git Commands</h4>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <code class="bg-gray-800 px-2 py-1 rounded text-xs">git checkout {currentStepData.branchName}</code>
+              <button class="copy-btn px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" data-copy="git checkout {currentStepData.branchName}">
+                Copy
+              </button>
+            </div>
+            <div class="flex items-center justify-between">
+              <code class="bg-gray-800 px-2 py-1 rounded text-xs">git pull origin {currentStepData.branchName}</code>
+              <button class="copy-btn px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" data-copy="git pull origin {currentStepData.branchName}">
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="border border-gray-600 rounded-lg p-4">
+          <h4 class="font-semibold mb-2">Step Navigation</h4>
+          <div class="flex gap-2">
+            {stepNumber > 1 && (
+              <a
+                href={`/labs/${lab.slug}/step/${stepNumber - 1}`}
+                class="px-3 py-1 text-sm border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+              >
+                ← Previous
+              </a>
+            )}
+            {stepNumber < totalSteps && (
+              <a
+                href={`/labs/${lab.slug}/step/${stepNumber + 1}`}
+                class="px-3 py-1 text-sm border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors"
+              >
+                Next →
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Navigation Footer -->
+    <footer class="border-t border-gray-700 pt-6">
+      <div class="flex items-center justify-between">
+        <a
+          href={`/labs/${lab.slug}`}
+          class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+        >
+          ← Back to Lab Overview
+        </a>
+
+        <div class="flex gap-2">
+          <a
+            href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-4 py-2 border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors"
+          >
+            View Branch on GitHub ↗
+          </a>
+          <a
+            href="/labs"
+            class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+          >
+            All Labs
+          </a>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Copy button functionality
+      document.querySelectorAll('.copy-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          const textToCopy = button.getAttribute('data-copy');
+          if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+              const original = button.textContent;
+              button.textContent = 'Copied!';
+              setTimeout(() => {
+                button.textContent = original;
+              }, 2000);
+            });
+          }
+        });
+      });
+
+      // Ensure heading anchors work for direct links (GitHub HTML sometimes lacks id on the heading tag)
+      try {
+        document.querySelectorAll('.markdown-body .markdown-heading').forEach((wrapper) => {
+          const anchor = wrapper.querySelector('a.anchor[href^="#"]');
+          const heading = wrapper.querySelector('h1, h2, h3, h4, h5, h6');
+          if (anchor && heading) {
+            const href = anchor.getAttribute('href');
+            if (href && href.startsWith('#')) {
+              const id = href.slice(1);
+              if (!heading.id) heading.id = id;
+            }
+          }
+        });
+      } catch (e) {
+        // no-op
+      }
+    });
+  </script>
+</BaseLayout>
