@@ -3,12 +3,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import AlertBox from '../components/AlertBox.astro';
 import LatestActivity from '../components/LatestActivity.astro';
 // Server-only/build-time: determine whether to show Discord invite
-const discordInviteEnabled = String((import.meta as any)?.env?.DISCORD_SERVER_INVITE ?? "")
+const discordInviteEnabled = String(import.meta.env.DISCORD_SERVER_INVITE ?? "")
   .toLowerCase()
   .trim() === "true";
 const discordInviteUrl: string | undefined = (() => {
   try {
-    const fromImport = (import.meta as any)?.env?.DISCORD_INVITE_URL as string | undefined;
+    const fromImport = import.meta.env.DISCORD_INVITE_URL as string | undefined;
     const fromProcess = typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
     return fromImport || fromProcess;
   } catch {

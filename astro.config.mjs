@@ -17,5 +17,7 @@ export default defineConfig({
   ],
 
   site: 'https://shart.cloud',
-  adapter: cloudflare(),
+  adapter: cloudflare({
+    imageService: 'compile'
+  }),
 });

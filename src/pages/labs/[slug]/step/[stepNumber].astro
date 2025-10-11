@@ -187,6 +187,21 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
           </div>
         </div>
       </div>
+
+      <!-- Bug Report Notice -->
+      <div class="mt-6 border border-term-green/30 rounded-lg p-4 bg-term-green/5">
+        <p class="text-sm text-gray-300">
+          Found a bug or issue with this lab step?
+          <a
+            href={`https://github.com/${lab.data.githubRepo}/issues`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-term-green hover:text-term-green-dark underline"
+          >
+            Open an issue on GitHub ↗
+          </a>
+        </p>
+      </div>
     </article>
 
     <!-- Navigation Footer -->
