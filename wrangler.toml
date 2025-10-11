@@ -9,3 +9,7 @@ directory = "./dist"
 
 [observability]
 enabled = true
+
+# Development environment
+[env.dev]
+name = "shart-platform-dev"
