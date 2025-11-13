@@ -18,7 +18,7 @@
     "@astrojs/tailwind": "^6.0.2",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/orbitron": "^5.2.8",
-    "astro": "^5.14.1",
+    "astro": "^5.15.6",
     "d3": "^7.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
