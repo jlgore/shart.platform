@@ -11,11 +11,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
+    "@astrojs/check": "^0.9.5",
     "@astrojs/cloudflare": "^12.6.10",
-    "@astrojs/mdx": "^4.3.7",
+    "@astrojs/mdx": "^4.3.8",
     "@astrojs/react": "^4.4.0",
-    "@astrojs/rss": "^4.0.12",
+    "@astrojs/rss": "^4.0.13",
     "@astrojs/tailwind": "^6.0.2",
     "@duckdb/duckdb-wasm": "^1.29.0",
     "@fontsource/jetbrains-mono": "^5.2.8",
@@ -24,7 +24,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@resvg/resvg-wasm": "^2.6.2",
     "@tailwindcss/typography": "^0.5.19",
-    "astro": "^5.14.4",
+    "astro": "^5.15.1",
     "d3": "^7.9.0",
     "fflate": "^0.8.2",
     "monaco-editor": "^0.52.0",

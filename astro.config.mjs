@@ -23,6 +23,17 @@ export default defineConfig({
   vite: {
     ssr: {
       external: ['node:path', 'node:fs/promises']
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'monaco': ['monaco-editor', '@monaco-editor/react'],
+            'duckdb': ['@duckdb/duckdb-wasm'],
+            'resvg': ['@resvg/resvg-js', '@resvg/resvg-wasm']
+          }
+        }
+      }
     }
   }
 });

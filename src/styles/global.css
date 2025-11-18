@@ -1,7 +1,7 @@
-/* Fonts */
-@import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/700.css';
-@import '@fontsource/orbitron/700.css';
+/* Fonts with optimized loading */
+@import '@fontsource/jetbrains-mono/400.css' layer(fonts);
+@import '@fontsource/jetbrains-mono/700.css' layer(fonts);
+@import '@fontsource/orbitron/700.css' layer(fonts);
 
 @tailwind base;
 @tailwind components;

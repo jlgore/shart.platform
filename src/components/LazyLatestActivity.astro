@@ -1,0 +1,75 @@
+---
+// Lazy-loaded version of LatestActivity with intersection observer
+export interface Props {
+  limit?: number;
+  include?: Array<'blog' | 'labs' | 'ctf'>;
+}
+
+const { limit = 6, include = ['blog', 'labs'] } = Astro.props as Props;
+const id = `lazy-activity-${Math.random().toString(36).substr(2, 9)}`;
+---
+
+<section class="terminal-window" id={id}>
+  <h2 class="text-xl font-bold mb-4">Latest Activity</h2>
+  <div class="activity-placeholder">
+    <p class="text-sm opacity-80">Loading latest activity...</p>
+  </div>
+</section>
+
+<script define:vars={{ id, limit, include }}>
+  // Lazy load activity data when component becomes visible
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(async (entry) => {
+      if (entry.isIntersecting) {
+        observer.unobserve(entry.target);
+
+        try {
+          const response = await fetch(`/api/latest-activity?limit=${limit}&include=${include.join(',')}`);
+          const data = await response.json();
+
+          const placeholder = entry.target.querySelector('.activity-placeholder');
+          if (placeholder && data.activities) {
+            placeholder.innerHTML = data.activities.length === 0
+              ? '<p class="text-sm opacity-80">No recent activity yet.</p>'
+              : `
+                <ul class="space-y-2">
+                  ${data.activities.map(item => `
+                    <li class="flex items-center justify-between">
+                      <a class="hover:text-term-green-dark" href="${item.href}"${item.external ? ' target="_blank" rel="noopener noreferrer"' : ''}>
+                        ${item.type === 'lab' ? '[Lab] ' : item.type === 'ctf' ? '[CTF] ' : '[Blog] '} ${item.title}
+                        ${item.external ? ' ↗' : ''}
+                      </a>
+                      <span class="text-xs text-term-green/70">
+                        ${new Date(item.date).toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                          timeZone: 'UTC'
+                        })}
+                      </span>
+                    </li>
+                  `).join('')}
+                </ul>
+                <p class="mt-4 text-sm flex gap-4">
+                  <a class="hover:text-term-green-dark" href="/blog">View all posts →</a>
+                  <a class="hover:text-term-green-dark" href="/labs">View all labs →</a>
+                  ${include.includes('ctf') ? '<a class="hover:text-term-green-dark" href="/ctf">View all CTFs →</a>' : ''}
+                </p>
+              `;
+          }
+        } catch (error) {
+          console.error('Failed to load latest activity:', error);
+          const placeholder = entry.target.querySelector('.activity-placeholder');
+          if (placeholder) {
+            placeholder.innerHTML = '<p class="text-sm opacity-80 text-red-400">Failed to load activity.</p>';
+          }
+        }
+      }
+    });
+  }, { rootMargin: '50px' });
+
+  const element = document.getElementById(id);
+  if (element) {
+    observer.observe(element);
+  }
+</script>

@@ -105,6 +105,17 @@ const labsCollection = defineCollection({
     draft: z.boolean().default(false),
     publishedDate: z.coerce.date(),
     lastUpdated: z.coerce.date().optional(),
+    // Optional client-side variable schema for placeholder replacement in README content
+    variables: z
+      .array(
+        z.object({
+          key: z.string(), // e.g., 'WEB_SERVER_PUBLIC_IP'
+          label: z.string().optional(),
+          pattern: z.string().optional(), // optional regex for validation
+          example: z.string().optional(),
+        })
+      )
+      .default([]),
   }),
 });
 
@@ -113,20 +124,24 @@ export const collections = {
   bios: biosCollection,
   ctf: ctfCollection,
   labs: labsCollection,
-  // Catalog of site-hosted log packs used in the Log Lab
-  logPacks: defineCollection({
+  // Speaking engagements, conferences, streams, etc.
+  events: defineCollection({
     type: 'content',
     schema: z.object({
       title: z.string(),
       description: z.string(),
-      packId: z.string(), // e.g., 'starter-vpc-cloudtrail'
-      r2Key: z.string(), // key/path in R2 bucket, e.g., 'packs/starter-vpc-cloudtrail.tar.gz'
-      sha256: z.string().length(64), // lowercase hex digest for integrity check
-      sizeBytes: z.number(), // compressed size
-      sources: z.array(
-        z.enum(['vpc_flow', 'cloudtrail', 'alb', 'guardduty', 'cloudwatch', 'azure_activity', 'gcp_audit'])
-      ),
-      difficulty: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
+      // Support date or datetime; coerce to Date
+      startDate: z.coerce.date(),
+      endDate: z.coerce.date().optional(), // for multi-day events
+      allDay: z.boolean().default(false),
+      speakers: z.array(z.string()).default([]), // free-text list
+      // Optional: bios slugs to resolve rich speaker info from `bios` collection
+      speakerBios: z.array(z.string()).default([]),
+      // Optional timezone details for display (e.g., 'America/New_York' and label 'ET')
+      timeZone: z.string().optional(),
+      timeZoneLabel: z.string().optional(),
+      location: z.string().optional(),
+      url: z.string().url().optional(), // external event link/registration
       tags: z.array(z.string()).default([]),
       draft: z.boolean().default(false),
     }),

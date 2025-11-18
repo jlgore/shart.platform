@@ -30,6 +30,24 @@ const showDiscordInvite = discordInviteEnabled && !!discordInviteUrl;
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} | SHART.CLOUD</title>
+
+    <!-- Font preloading for better INP -->
+    <link rel="preload" href="/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- DNS prefetch and resource hints -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://github.com" />
+
+    <!-- Preconnect to critical origins -->
+    <link rel="preconnect" href="https://api.github.com" crossorigin />
+
+    <!-- Critical CSS inline for faster rendering -->
+    <style>
+      body { font-family: 'JetBrains Mono', monospace; }
+      .navbar { position: sticky; top: 0; z-index: 40; }
+    </style>
+
     <slot name="head" />
   </head>
   <body class="bg-black text-term-green">

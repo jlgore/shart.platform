@@ -1,0 +1,63 @@
+---
+import { getCollection } from 'astro:content';
+import type { EventEntry } from '../../lib/events';
+import { getUpcomingEvents, eventHref, formatEventDateRange } from '../../lib/events';
+
+export interface Props {
+  limit?: number;
+  title?: string;
+}
+
+const { limit = 1, title = 'Upcoming' } = Astro.props as Props;
+
+const events: EventEntry[] = await getUpcomingEvents(limit);
+
+// Preload bios to optionally enrich speaker names/links
+const bios = await getCollection('bios');
+const bioBySlug = new Map(bios.map((b) => [b.slug, b] as const));
+
+function resolveSpeakerNames(e: EventEntry): string[] {
+  const names = [...(e.data.speakers ?? [])];
+  for (const slug of e.data.speakerBios ?? []) {
+    const bio = bioBySlug.get(slug);
+    if (bio) names.push(bio.data.name);
+  }
+  // De-dup names while preserving order
+  return [...new Set(names)].filter((n) => n && n.trim().length > 0);
+}
+
+function formatSpeakerLabel(names: string[]): string {
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} + ${names[1]}`;
+  return `${names[0]} + ${names.length - 1} more`;
+}
+---
+
+{events.length === 0 ? null : (
+  <section class="terminal-window mb-10">
+    <h2 class="text-xl font-bold mb-3">{title}</h2>
+    <ul class="space-y-2">
+      {events.map((e) => {
+        const names = resolveSpeakerNames(e);
+        const label = formatSpeakerLabel(names);
+        const href = eventHref(e);
+        const isExternal = Boolean(e.data.url);
+        const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
+        return (
+          <li class="flex items-center justify-between gap-4">
+            <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-term-green-dark">
+              {label ? `${label} @ ${e.data.title}` : e.data.title}
+              {isExternal ? ' ↗' : ''}
+            </a>
+            <span class="text-xs text-term-green/70">{dateStr}</span>
+          </li>
+        );
+      })}
+    </ul>
+    <p class="mt-4 text-sm">
+      <a class="hover:text-term-green-dark" href="/events">View all events →</a>
+    </p>
+  </section>
+)}
+

@@ -141,8 +141,36 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
       <div class="border border-term-green/30 rounded-lg p-6 mb-6">
         <h3 class="text-lg font-semibold mb-4">Step {stepNumber}: {currentStepData.title}</h3>
 
+        <!-- Lab Variables: paste Terraform output and define placeholders -->
+        <section id="lab-vars-panel" data-lab-slug={lab.slug} class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-semibold">Lab Variables</h4>
+            <button id="toggle-lab-vars" class="px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" aria-expanded="true" aria-controls="lab-vars-content">Hide</button>
+          </div>
+          <p class="text-sm text-gray-300 mb-3">
+            Paste your Terraform outputs (raw or <code>terraform output -json</code>). We'll replace placeholders like
+            <code>&lt;WEB_SERVER_PUBLIC_IP&gt;</code> in the commands below.
+          </p>
+          <div id="lab-vars-content" class="space-y-2">
+            <textarea id="tf-output" class="w-full bg-black border border-gray-600 rounded p-2 text-sm font-mono" rows="4" placeholder="terraform output or terraform output -json"></textarea>
+            <div class="flex gap-2">
+              <button id="btn-parse-tf" class="px-3 py-1 text-xs border border-term-green/60 text-term-green rounded hover:bg-term-green/10">Parse Outputs</button>
+              <button id="btn-apply-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Apply to Commands</button>
+              <button id="btn-clear-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Clear</button>
+            </div>
+            <div id="vars-list" class="grid md:grid-cols-2 gap-2"></div>
+            <p class="text-xs text-gray-400">Values are stored locally in your browser for this lab.</p>
+          </div>
+        </section>
+
         <!-- Render README content from GitHub as HTML -->
-        <div class="prose prose-invert max-w-none" set:html={readmeHtml} />
+        <div
+          id="readme-container"
+          class="prose prose-invert max-w-none"
+          data-repo={lab.data.githubRepo}
+          data-branch={currentStepData.branchName}
+          set:html={readmeHtml}
+        ></div>
       </div>
 
       <!-- Quick Actions -->
@@ -234,8 +262,344 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
     </footer>
   </main>
 
+  <!-- Embed variable schema for client-side use -->
+  <script type="application/json" id="lab-vars-schema">{JSON.stringify(lab.data.variables || [])}</script>
+
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const expectedSchema = (() => {
+        const node = document.getElementById('lab-vars-schema');
+        if (!node) return [];
+        try { return JSON.parse(node.textContent || '[]'); } catch { return []; }
+      })();
+      // --- Lab variable replacement ---
+      const panel = document.getElementById('lab-vars-panel');
+      const labSlug = panel?.getAttribute('data-lab-slug') || 'unknown';
+      const storageKey = `labVars:${labSlug}`;
+      const readme = document.getElementById('readme-container');
+      const varsList = document.getElementById('vars-list');
+      const tfTextarea = document.getElementById('tf-output');
+      const btnParse = document.getElementById('btn-parse-tf');
+      const btnApply = document.getElementById('btn-apply-vars');
+      const btnClear = document.getElementById('btn-clear-vars');
+      const varsContent = document.getElementById('lab-vars-content');
+      const varsToggle = document.getElementById('toggle-lab-vars');
+      const collapsedKey = `labVarsCollapsed:${labSlug}`;
+
+      function loadVars() {
+        try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+      }
+      function saveVars(obj) {
+        localStorage.setItem(storageKey, JSON.stringify(obj || {}));
+      }
+
+      function toVarKey(k) {
+        return String(k || '')
+          .trim()
+          .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
+          .replace(/[^A-Za-z0-9]+/g, '_')
+          .toUpperCase();
+      }
+
+      function detectPlaceholders() {
+        const keys = new Set();
+        if (!readme) return keys;
+        readme.querySelectorAll('code').forEach((el) => {
+          const t = el.textContent || '';
+          // Accept upper/lowercase for placeholder tokens inside <...>
+          const re = /<([A-Za-z0-9_\-.:]+)>/g;
+          let m; while ((m = re.exec(t)) !== null) { keys.add(toVarKey(m[1])); }
+        });
+        return keys;
+      }
+
+      function renderVarInputs(varsMap, expectedKeys) {
+        if (!varsList) return;
+        varsList.innerHTML = '';
+        const schemaKeys = Array.isArray(expectedSchema) ? expectedSchema.map((v) => (v && v.key ? String(v.key) : '')).filter(Boolean).map(toVarKey) : [];
+        const keys = Array.from(new Set([...(expectedKeys || []), ...schemaKeys, ...Object.keys(varsMap || {})])).sort();
+        for (const k of keys) {
+          const id = `var-${k}`;
+          const value = varsMap[k] ?? '';
+          const wrap = document.createElement('div');
+          wrap.className = 'flex items-center gap-2';
+          wrap.innerHTML = `
+            <label for="${id}" class="text-xs text-gray-400 min-w-[10rem]">${k}</label>
+            <input id="${id}" data-var-key="${k}" class="flex-1 bg-black border border-gray-600 rounded p-1 text-sm font-mono" value="${value.toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" />
+          `;
+          varsList.appendChild(wrap);
+        }
+      }
+
+      function collectVarsFromInputs() {
+        const map = {};
+        varsList?.querySelectorAll('input[data-var-key]').forEach((inp) => {
+          const key = inp.getAttribute('data-var-key');
+          if (!key) return;
+          map[key] = inp.value.trim();
+        });
+        return map;
+      }
+
+      function applyVars(map) {
+        if (!readme) return;
+        const keys = Object.keys(map || {});
+        if (keys.length === 0) return;
+        const codeEls = readme.querySelectorAll('code');
+        codeEls.forEach((el) => {
+          // Backup original content once
+          if (!(el as any)._orig) {
+            (el as any)._orig = el.textContent || '';
+          }
+          let t = (el as any)._orig;
+          // Resolve any <TOKEN> where TOKEN may include letters, '.', ':' or '_'
+          const tokenRe = /<([A-Za-z0-9_\-.:]+)>/g;
+          const seen = new Set();
+          let m;
+          while ((m = tokenRe.exec(t)) !== null) {
+            const raw = m[1];
+            if (seen.has(raw)) continue;
+            seen.add(raw);
+            const norm = toVarKey(raw);
+            const val = map[norm];
+            if (!val) continue;
+            t = t.replace(new RegExp(`<${raw}>`, 'g'), val);
+          }
+          el.textContent = t;
+        });
+      }
+
+      function parseTerraformOutputs(text) {
+        const out = {};
+        if (!text) return out;
+        const trimmed = text.trim();
+        // JSON mode from `terraform output -json`
+        if (trimmed.startsWith('{')) {
+          try {
+            const obj = JSON.parse(trimmed);
+            for (const k of Object.keys(obj)) {
+              const entry = obj[k];
+              let val = entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+              if (Array.isArray(val)) val = val.join(',');
+              if (val && typeof val === 'object' && !Array.isArray(val)) {
+                // Store JSON string for full map
+                out[toVarKey(k)] = JSON.stringify(val);
+                // Also flatten first-level keys
+                for (const sk of Object.keys(val)) {
+                  const fk = `${toVarKey(k)}_${toVarKey(sk)}`;
+                  const v = val[sk];
+                  out[fk] = Array.isArray(v) || (v && typeof v === 'object') ? JSON.stringify(v) : String(v ?? '');
+                }
+              } else {
+                out[toVarKey(k)] = String(val ?? '');
+              }
+            }
+            return out;
+          } catch (e) {
+            // fallthrough to line mode
+          }
+        }
+        // Line mode from `terraform output`
+        const lines = trimmed.split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const m = line.match(/^\s*([A-Za-z0-9_\-]+)\s*=\s*(.+)$/);
+          if (!m) continue;
+          const key = toVarKey(m[1]);
+          let valRaw = m[2].trim();
+          // Map/object block starting with '{'
+          if (valRaw === '{' || valRaw.startsWith('{')) {
+            const blockLines = [];
+            let rest = '';
+            if (valRaw !== '{') {
+              rest = valRaw.slice(valRaw.indexOf('{') + 1);
+              if (rest && rest.trim()) blockLines.push(rest);
+            }
+            let depth = 1;
+            for (i = i + 1; i < lines.length; i++) {
+              const ln = lines[i];
+              const open = (ln.match(/\{/g) || []).length;
+              const close = (ln.match(/\}/g) || []).length;
+              depth += open - close;
+              if (depth <= 0) {
+                const beforeClose = ln.slice(0, ln.lastIndexOf('}'));
+                if (beforeClose && beforeClose.trim()) blockLines.push(beforeClose);
+                break;
+              } else {
+                blockLines.push(ln);
+              }
+            }
+            const obj = {};
+            for (const bl of blockLines) {
+              const lineTrim = bl.trim();
+              if (!lineTrim) continue;
+              const mm = lineTrim.match(/^"?([A-Za-z0-9_\-.]+)"?\s*=\s*(.+)$/);
+              if (!mm) continue;
+              const subKey = mm[1];
+              let subValRaw = mm[2].trim();
+              subValRaw = subValRaw.replace(/,+\s*$/, '');
+              const q = subValRaw.match(/^"([\s\S]*?)"$/);
+              if (q) {
+                obj[subKey] = q[1];
+                continue;
+              }
+              if (/^(true|false)$/i.test(subValRaw)) {
+                obj[subKey] = /^true$/i.test(subValRaw);
+                continue;
+              }
+              if (/^-?\d+(?:\.\d+)?$/.test(subValRaw)) {
+                obj[subKey] = Number(subValRaw);
+                continue;
+              }
+              const listMatch2 = subValRaw.match(/^(?:tolist\()?\s*(\[.*\])\s*\)?$/);
+              if (listMatch2) {
+                try {
+                  const arr = JSON.parse(listMatch2[1]);
+                  obj[subKey] = arr;
+                  continue;
+                } catch {}
+              }
+              obj[subKey] = subValRaw;
+            }
+            try { out[key] = JSON.stringify(obj); } catch { out[key] = String(obj); }
+            for (const sk in obj) {
+              const flatKey = `${key}_${toVarKey(sk)}`;
+              const v = obj[sk];
+              out[flatKey] = Array.isArray(v) || (v && typeof v === 'object') ? JSON.stringify(v) : String(v);
+            }
+            continue;
+          }
+          // Strip quotes
+          const quoted = valRaw.match(/^"([\s\S]*?)"$/);
+          if (quoted) {
+            out[key] = quoted[1];
+            continue;
+          }
+          // tolist([...]) or list [...]
+          const listMatch = valRaw.match(/tolist\((\[.*\])\)/) || valRaw.match(/^(\[.*\])$/);
+          if (listMatch) {
+            try {
+              const arr = JSON.parse(listMatch[1]);
+              out[key] = Array.isArray(arr) ? arr.join(',') : String(arr);
+              continue;
+            } catch { /* ignore */ }
+          }
+          // Fallback
+          out[key] = valRaw;
+        }
+        return out;
+      }
+
+      function init() {
+        const stored = loadVars();
+        const detected = detectPlaceholders();
+        renderVarInputs(stored, detected);
+        // Apply on load
+        applyVars(stored);
+        // Attempt client-side README load if SSR failed
+        ensureReadmeLoaded();
+        // Initialize collapsible state
+        try {
+          const collapsed = JSON.parse(localStorage.getItem(collapsedKey) || 'false');
+          if (collapsed && varsContent && varsToggle) {
+            varsContent.classList.add('hidden');
+            varsToggle.setAttribute('aria-expanded', 'false');
+            varsToggle.textContent = 'Show';
+          }
+        } catch {}
+        varsToggle?.addEventListener('click', () => {
+          if (!varsContent || !varsToggle) return;
+          const isHidden = varsContent.classList.toggle('hidden');
+          varsToggle.setAttribute('aria-expanded', (!isHidden).toString());
+          varsToggle.textContent = isHidden ? 'Show' : 'Hide';
+          localStorage.setItem(collapsedKey, JSON.stringify(isHidden));
+        });
+      }
+
+      // Very conservative client-side sanitizer
+      function clientSanitizeHtml(input) {
+        if (!input) return '';
+        let out = String(input);
+        // Remove script blocks completely
+        out = out.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+        // Remove dangerous tags (keep inner text)
+        out = out.replace(/<\/?\s*(iframe|object|embed|style|link|meta|base|form)[^>]*>/gi, '');
+        // Neutralize javascript: URLs
+        out = out.replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+        out = out.replace(/(href|src)\s*=\s*javascript:[^\s>]+/gi, '$1="#"');
+        // Strip inline event handlers and srcdoc
+        out = out.replace(/\s+on[a-z]+\s*=\s*(["']).*?\1/gi, '');
+        out = out.replace(/\s+on[a-z]+\s*=\s*[^\s>]+/gi, '');
+        out = out.replace(/\s+srcdoc\s*=\s*(["']).*?\1/gi, '');
+        // Remove inline styles entirely
+        out = out.replace(/\s+style\s*=\s*(["']).*?\1/gi, '');
+        out = out.replace(/\s+style\s*=\s*[^\s>]+/gi, '');
+        return out;
+      }
+
+      async function ensureReadmeLoaded() {
+        if (!readme) return;
+        const content = (readme.innerHTML || '').trim();
+        const text = (readme.textContent || '').trim();
+        const looksEmpty = content.length === 0;
+        const hasFallback = /Unable to load README|README content will appear here/.test(text);
+        if (!(looksEmpty || hasFallback)) return;
+        try {
+          const repo = readme.getAttribute('data-repo');
+          const branch = readme.getAttribute('data-branch') || 'main';
+          if (!repo) return;
+          const res = await fetch(`https://api.github.com/repos/${repo}/readme?ref=${encodeURIComponent(branch)}`, {
+            headers: { 'Accept': 'application/vnd.github.v3.html' }
+          });
+          if (!res.ok) return;
+          const html = await res.text();
+          const safe = clientSanitizeHtml(html);
+          readme.innerHTML = safe;
+          // Re-apply any variable replacements now that content exists
+          const stored = loadVars();
+          applyVars(stored);
+          // Refresh inputs with any newly detected placeholders
+          renderVarInputs(stored, detectPlaceholders());
+        } catch {}
+      }
+
+      btnParse?.addEventListener('click', () => {
+        const parsed = parseTerraformOutputs(tfTextarea?.value || '');
+        if (Object.keys(parsed).length === 0) return;
+        const current = loadVars();
+        const merged = { ...current, ...parsed };
+        saveVars(merged);
+        const detected = detectPlaceholders();
+        renderVarInputs(merged, detected);
+        applyVars(merged);
+      });
+
+      btnApply?.addEventListener('click', () => {
+        // Merge current inputs with any parsable textarea content for convenience
+        const current = collectVarsFromInputs();
+        const parsed = parseTerraformOutputs(tfTextarea?.value || '');
+        const merged = { ...current, ...parsed };
+        saveVars(merged);
+        applyVars(merged);
+        renderVarInputs(merged, detectPlaceholders());
+      });
+
+      btnClear?.addEventListener('click', () => {
+        saveVars({});
+        tfTextarea && (tfTextarea.value = '');
+        renderVarInputs({}, detectPlaceholders());
+        // Restore original code content if backed up
+        if (readme) {
+          readme.querySelectorAll('code').forEach((el) => {
+            if ((el as any)._orig) {
+              el.textContent = (el as any)._orig;
+            }
+          });
+        }
+      });
+
+      init();
+
       // Copy button functionality
       document.querySelectorAll('.copy-btn').forEach(button => {
         button.addEventListener('click', () => {

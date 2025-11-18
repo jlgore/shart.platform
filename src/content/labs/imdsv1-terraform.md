@@ -17,6 +17,10 @@ learningObjectives: [
 publishedDate: 2025-10-08
 isActive: true
 draft: false
+variables:
+  - key: WEB_SERVER_PUBLIC_IP
+    label: "Web Server Public IP"
+    example: "203.0.113.42"
 ---
 
 # IMDSv1 to IMDSv2 Migration Lab

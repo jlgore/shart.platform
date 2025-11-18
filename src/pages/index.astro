@@ -1,21 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import AlertBox from '../components/AlertBox.astro';
-import LatestActivity from '../components/LatestActivity.astro';
-// Server-only/build-time: determine whether to show Discord invite
-const discordInviteEnabled = String(import.meta.env.DISCORD_SERVER_INVITE ?? "")
-  .toLowerCase()
-  .trim() === "true";
-const discordInviteUrl: string | undefined = (() => {
-  try {
-    const fromImport = import.meta.env.DISCORD_INVITE_URL as string | undefined;
-    const fromProcess = typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
-    return fromImport || fromProcess;
-  } catch {
-    return typeof process !== 'undefined' ? process.env.DISCORD_INVITE_URL : undefined;
-  }
-})();
-const showDiscordInvite = discordInviteEnabled && !!discordInviteUrl;
+import LazyLatestActivity from '../components/LazyLatestActivity.astro';
+import UpcomingEvents from '../components/events/UpcomingEvents.astro';
 ---
 
 <BaseLayout title="Home">
@@ -30,13 +16,8 @@ const showDiscordInvite = discordInviteEnabled && !!discordInviteUrl;
     </div>
   </section>
 
-  {!showDiscordInvite && (
-    <div class="mb-10">
-      <AlertBox variant="warning" title="Heads up" class="shadow-md">
-        Discord server coming soon?
-      </AlertBox>
-    </div>
-  )}
+  <UpcomingEvents limit={1} title="Upcoming events" />
 
-  <LatestActivity limit={6} include={["blog", "labs"]} />
+
+  <LazyLatestActivity limit={6} include={["blog", "labs"]} />
 </BaseLayout>
