@@ -10,6 +10,23 @@ const resolveToken = () => {
   }
 };
 
+function rewriteRelativeImageUrls(html: string, repo: string, filePath: string, ref: string): string {
+  const fileDir = filePath.includes('/') ? filePath.split('/').slice(0, -1).join('/') : '';
+  const rawBase = fileDir
+    ? `https://raw.githubusercontent.com/${repo}/${ref}/${fileDir}/`
+    : `https://raw.githubusercontent.com/${repo}/${ref}/`;
+
+  return html.replace(/(<img\b[^>]+\bsrc=)(["'])([^"']+)\2/gi, (_match, prefix, quote, src) => {
+    if (/^(https?:\/\/|\/\/|data:)/i.test(src)) return _match;
+    try {
+      const absolute = new URL(src, rawBase).href;
+      return `${prefix}${quote}${absolute}${quote}`;
+    } catch {
+      return _match;
+    }
+  });
+}
+
 const readmeHtmlCache: Map<string, string> = new Map();
 const readmeRawCache: Map<string, { content: string; sha: string; downloadUrl: string }> = new Map();
 const markdownFileHtmlCache: Map<string, string> = new Map();
@@ -193,7 +210,8 @@ export class GitHubREADMEFetcher {
     if (cached) return cached;
 
     const markdown = await this.fetchMarkdownFile(repo, filePath, ref);
-    const html = await this.renderMarkdownToHtml(markdown, repo);
+    const rawHtml = await this.renderMarkdownToHtml(markdown, repo);
+    const html = rewriteRelativeImageUrls(rawHtml, repo, filePath, ref);
     markdownFileHtmlCache.set(cacheKey, html);
     return html;
   }
