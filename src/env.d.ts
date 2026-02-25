@@ -13,11 +13,13 @@ interface ImportMeta {
 
 // Cloudflare runtime bindings
 type D1Database = import('@cloudflare/workers-types').D1Database;
+type Fetcher = import('@cloudflare/workers-types').Fetcher;
 
 interface CloudflareEnv {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   API_BASE_URL?: string;
+  PLATFORM_API: Fetcher;
 }
 
 type Runtime = import('@astrojs/cloudflare').Runtime<CloudflareEnv>;

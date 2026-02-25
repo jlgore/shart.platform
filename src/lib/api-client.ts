@@ -3,13 +3,18 @@
  * Used in SSR pages to fetch CTF data
  */
 
-// Fallback for when runtime env isn't available
+type Fetcher = import('@cloudflare/workers-types').Fetcher;
+
+// Fallback URL used when no service binding is available (local dev)
 const DEFAULT_API_BASE = import.meta.env.PROD
   ? 'https://platform.shart.cloud'
   : 'http://localhost:8787';
 
 export interface ApiClientOptions {
   sessionToken?: string;
+  /** Cloudflare service binding — preferred over apiBase in Worker runtime */
+  binding?: Fetcher;
+  /** HTTP base URL fallback (local dev / client-side) */
   apiBase?: string;
 }
 
@@ -27,8 +32,7 @@ async function fetchApi<T>(
   path: string,
   options: ApiClientOptions & RequestInit = {}
 ): Promise<T> {
-  const { sessionToken, apiBase, ...fetchOptions } = options;
-  const baseUrl = apiBase || DEFAULT_API_BASE;
+  const { sessionToken, binding, apiBase, ...fetchOptions } = options;
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -39,10 +43,11 @@ async function fetchApi<T>(
     (headers as Record<string, string>)['Cookie'] = `better-auth.session_token=${sessionToken}`;
   }
 
-  const res = await fetch(`${baseUrl}${path}`, {
-    ...fetchOptions,
-    headers,
-  });
+  // Service binding: routes directly to the bound Worker, no public network egress.
+  // The hostname in the URL is arbitrary — Cloudflare ignores it.
+  const res = binding
+    ? await binding.fetch(`https://platform-api${path}`, { ...fetchOptions, headers })
+    : await fetch(`${apiBase || DEFAULT_API_BASE}${path}`, { ...fetchOptions, headers });
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -51,6 +56,8 @@ async function fetchApi<T>(
 
   return res.json();
 }
+
+type FetchOpts = Pick<ApiClientOptions, 'apiBase' | 'binding'>;
 
 // Types matching platform-api
 export interface Question {
@@ -120,38 +127,38 @@ export interface Achievement {
 }
 
 // API functions
-export async function getQuestions(ctf: string, sessionToken: string, apiBase?: string): Promise<Question[]> {
+export async function getQuestions(ctf: string, sessionToken: string, opts?: FetchOpts): Promise<Question[]> {
   const data = await fetchApi<{ questions: Question[] }>(
     `/api/ctf/questions?ctf=${ctf}`,
-    { sessionToken, apiBase }
+    { sessionToken, ...opts }
   );
   return data.questions;
 }
 
-export async function getStatus(ctf: string, sessionToken: string, apiBase?: string): Promise<PlayerStatus> {
-  return fetchApi<PlayerStatus>(`/api/ctf/status?ctf=${ctf}`, { sessionToken, apiBase });
+export async function getStatus(ctf: string, sessionToken: string, opts?: FetchOpts): Promise<PlayerStatus> {
+  return fetchApi<PlayerStatus>(`/api/ctf/status?ctf=${ctf}`, { sessionToken, ...opts });
 }
 
-export async function getLeaderboard(limit = 50, offset = 0, apiBase?: string): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(limit = 50, offset = 0, opts?: FetchOpts): Promise<LeaderboardEntry[]> {
   const data = await fetchApi<{ leaderboard: LeaderboardEntry[] }>(
     `/api/ctf/leaderboard?limit=${limit}&offset=${offset}`,
-    { apiBase }
+    { ...opts }
   );
   return data.leaderboard;
 }
 
-export async function getInstances(sessionToken: string, apiBase?: string): Promise<Instance[]> {
+export async function getInstances(sessionToken: string, opts?: FetchOpts): Promise<Instance[]> {
   const data = await fetchApi<{ instances: Instance[] }>(
     '/api/ctf/instances',
-    { sessionToken, apiBase }
+    { sessionToken, ...opts }
   );
   return data.instances;
 }
 
-export async function getAchievements(ctf: string, sessionToken?: string, apiBase?: string): Promise<Achievement[]> {
+export async function getAchievements(ctf: string, sessionToken?: string, opts?: FetchOpts): Promise<Achievement[]> {
   const data = await fetchApi<{ achievements: Achievement[] }>(
     `/api/ctf/achievements?ctf=${ctf}`,
-    { sessionToken, apiBase }
+    { sessionToken, ...opts }
   );
   return data.achievements;
 }
@@ -160,12 +167,12 @@ export async function submitAnswer(
   questionId: string,
   answer: string,
   sessionToken: string,
-  apiBase?: string
+  opts?: FetchOpts
 ): Promise<{ correct: boolean; already_answered: boolean; points_awarded: number }> {
   return fetchApi('/api/ctf/questions/submit', {
     method: 'POST',
     sessionToken,
-    apiBase,
+    ...opts,
     body: JSON.stringify({ question_id: questionId, answer }),
   });
 }
@@ -174,12 +181,12 @@ export async function unlockHint(
   questionId: string,
   hintIndex: number,
   sessionToken: string,
-  apiBase?: string
+  opts?: FetchOpts
 ): Promise<{ success: boolean; hint: { index: number; text: string; cost: number } }> {
   return fetchApi('/api/ctf/questions/hint', {
     method: 'POST',
     sessionToken,
-    apiBase,
+    ...opts,
     body: JSON.stringify({ question_id: questionId, hint_index: hintIndex }),
   });
 }
@@ -192,23 +199,23 @@ export interface CourseProgressData {
 export async function getCourseProgress(
   courseSlug: string,
   sessionToken: string,
-  apiBase?: string
+  opts?: FetchOpts
 ): Promise<CourseProgressData> {
   return fetchApi<CourseProgressData>(
     `/api/courses/${encodeURIComponent(courseSlug)}/progress`,
-    { sessionToken, apiBase }
+    { sessionToken, ...opts }
   );
 }
 
 export async function registerInstance(
   ctfSlug: string,
   sessionToken: string,
-  apiBase?: string
+  opts?: FetchOpts
 ): Promise<{ instance_id: string; instance_secret: string; ctf_slug: string; kubectl_command: string }> {
   return fetchApi('/api/ctf/register', {
     method: 'POST',
     sessionToken,
-    apiBase,
+    ...opts,
     body: JSON.stringify({ ctf_slug: ctfSlug }),
   });
 }

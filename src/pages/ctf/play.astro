@@ -7,7 +7,8 @@ import { getQuestions, getStatus, ApiError, type Question } from '../../lib/api-
 
 const sessionToken = requireAuth(Astro);
 const user = Astro.locals.user!;
-const apiBase = Astro.locals.runtime?.env?.API_BASE_URL;
+const platformApi = Astro.locals.runtime?.env?.PLATFORM_API;
+const apiBase = Astro.locals.runtime?.env?.API_BASE_URL; // kept for client-side scripts
 
 const ctfSlug = Astro.url.searchParams.get('ctf') || 'shart-cloud';
 
@@ -17,8 +18,8 @@ let error = null;
 
 try {
   [questions, status] = await Promise.all([
-    getQuestions(ctfSlug, sessionToken, apiBase),
-    getStatus(ctfSlug, sessionToken, apiBase).catch(() => null),
+    getQuestions(ctfSlug, sessionToken, { binding: platformApi }),
+    getStatus(ctfSlug, sessionToken, { binding: platformApi }).catch(() => null),
   ]);
 } catch (e) {
   if (e instanceof ApiError) {

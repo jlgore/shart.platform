@@ -19,7 +19,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      # ── Frontend ─────────────────────────────────────────────────────────────
+      - name: Install root dependencies
         run: npm ci
 
       - name: Run tests
@@ -28,17 +29,42 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Deploy to Cloudflare Workers (Dev)
+      - name: Deploy frontend (dev)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env dev
 
+      # ── Platform API ─────────────────────────────────────────────────────────
+      - name: Install platform-api dependencies
+        run: npm ci
+        working-directory: platform-api
+
+      - name: Deploy platform-api (dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: platform-api
+          command: deploy --env dev
+
+      # ── Lab Worker ───────────────────────────────────────────────────────────
+      - name: Install lab-worker dependencies
+        run: npm ci
+        working-directory: lab-worker
+
+      - name: Deploy lab-worker (dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: lab-worker
+          command: deploy --env dev
+
       - name: Notify deployment success
         if: success()
-        run: |
-          echo "✅ Successfully deployed to development environment (shart-platform-dev)"
+        run: echo "✅ Successfully deployed all services to development"
 
       - name: Notify deployment failure
         if: failure()

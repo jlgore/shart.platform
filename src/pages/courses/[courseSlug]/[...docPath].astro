@@ -62,6 +62,8 @@ try {
 }
 
 // Prefetch completion status for logged-in users
+const platformApi = Astro.locals.runtime?.env?.PLATFORM_API;
+// apiBase kept for CourseMarkComplete (client-side React component, can't use service binding)
 const apiBase = Astro.locals.runtime?.env?.API_BASE_URL
   || (import.meta.env.PROD ? 'https://platform.shart.cloud' : 'http://localhost:8787');
 
@@ -70,7 +72,7 @@ if (user) {
   const sessionToken = getSessionToken(Astro);
   if (sessionToken) {
     try {
-      const progress = await getCourseProgress(courseSlug, sessionToken, apiBase);
+      const progress = await getCourseProgress(courseSlug, sessionToken, { binding: platformApi });
       isCompleted = progress.completed_docs.includes(normalizedDocPath);
     } catch {
       // ignore - defaults to false
