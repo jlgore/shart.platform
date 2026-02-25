@@ -20,17 +20,6 @@ export default {
           'elevated': 'var(--color-bg-elevated)',
           'border': 'var(--color-border)',
         },
-        // Legacy aliases for backwards compatibility during migration
-        'term-green': 'var(--color-primary)',
-        'term-green-dark': 'var(--color-primary-bright)',
-        'term-green-muted': 'var(--color-primary-muted)',
-        'term-green-subtle': 'var(--color-primary-subtle)',
-        'term-amber': 'var(--color-accent)',
-        'term-amber-muted': 'var(--color-accent-muted)',
-        'term-red': 'var(--color-error)',
-        'term-black': 'var(--color-bg)',
-        'term-gray': 'var(--color-bg-elevated)',
-        'term-border': 'var(--color-border)',
       },
       fontFamily: {
         'mono': ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
@@ -59,6 +48,7 @@ export default {
       },
       animation: {
         'glow': 'glow 2s ease-in-out infinite alternate',
+        'breathe': 'breathe 4s ease-in-out infinite',
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float 6s ease-in-out infinite',
         'scan': 'scan 8s linear infinite',
@@ -67,8 +57,12 @@ export default {
       },
       keyframes: {
         glow: {
-          '0%': { textShadow: '0 0 10px #00ff41, 0 0 20px #00ff41, 0 0 30px #00ff41' },
-          '100%': { textShadow: '0 0 20px #00ff41, 0 0 30px #00ff41, 0 0 40px #00ff41' }
+          '0%': { textShadow: '0 0 10px var(--color-primary), 0 0 20px var(--color-primary), 0 0 30px var(--color-primary)' },
+          '100%': { textShadow: '0 0 20px var(--color-primary), 0 0 30px var(--color-primary), 0 0 40px var(--color-primary)' }
+        },
+        breathe: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
         },
         float: {
           '0%, 100%': { transform: 'translateY(0px)' },
@@ -88,7 +82,7 @@ export default {
         },
         'blink-caret': {
           'from, to': { borderColor: 'transparent' },
-          '50%': { borderColor: '#00ff41' },
+          '50%': { borderColor: 'var(--color-primary)' },
         },
       },
       backgroundImage: {
