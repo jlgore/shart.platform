@@ -1,0 +1,788 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { requireAuth } from '../../lib/auth-helpers';
+import { getStatus, getInstances, getLeaderboard, ApiError } from '../../lib/api-client';
+
+const sessionToken = requireAuth(Astro);
+const user = Astro.locals.user!;
+const apiBase = Astro.locals.runtime?.env?.API_BASE_URL;
+
+const ctfSlug = Astro.url.searchParams.get('ctf') || 'shart-cloud';
+
+let status = null;
+let instances: Awaited<ReturnType<typeof getInstances>> = [];
+let leaderboard: Awaited<ReturnType<typeof getLeaderboard>> = [];
+let error = null;
+
+try {
+  [status, instances, leaderboard] = await Promise.all([
+    getStatus(ctfSlug, sessionToken, apiBase),
+    getInstances(sessionToken, apiBase),
+    getLeaderboard(10, 0, apiBase),
+  ]);
+} catch (e) {
+  if (e instanceof ApiError) {
+    error = e.message;
+  } else {
+    error = 'Failed to load dashboard data';
+  }
+}
+
+const progress = status
+  ? Math.round((status.questions_answered / Math.max(status.questions_total, 1)) * 100)
+  : 0;
+---
+
+<BaseLayout title="CTF Dashboard">
+  <header class="mb-8">
+    <div class="terminal-header">
+      <span class="text-xs" style="color: var(--color-primary-muted);">ACCESS: AUTHENTICATED</span>
+      <span class="text-xs" style="color: var(--color-primary-subtle);">USER: {user.email}</span>
+    </div>
+    <h1 class="text-2xl font-bold uppercase" style="color: var(--color-primary);">CTF Dashboard</h1>
+    <p class="text-sm mt-2" style="color: var(--color-primary-muted);">Track your progress, achievements, and instances</p>
+  </header>
+
+  {error ? (
+    <div class="terminal-window">
+      <p style="color: var(--color-error);">[ERROR] {error}</p>
+      <p class="mt-2" style="color: var(--color-primary-muted);">
+        Make sure you have registered for the CTF. <a href={`/ctf/play?ctf=${ctfSlug}`}>Start playing</a>
+      </p>
+    </div>
+  ) : (
+    <div class="dashboard-grid">
+      <!-- Status Card -->
+      <section class="terminal-window">
+        <div class="card-header">
+          <h2 class="card-title">Player Status</h2>
+          <span class="card-badge">{ctfSlug}</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="stat-value" style="color: var(--color-accent);">{status?.total_points || 0}</span>
+            <span class="stat-label">Total Points</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{status?.questions_answered || 0}/{status?.questions_total || 0}</span>
+            <span class="stat-label">Questions</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{status?.achievements?.length || 0}</span>
+            <span class="stat-label">Achievements</span>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" style={`width: ${progress}%`}></div>
+          </div>
+          <span class="progress-label">{progress}% Complete</span>
+        </div>
+
+        {status?.ghost_protocol_eligible && (
+          <div class="ghost-status">
+            <span class="ghost-icon">&#128123;</span>
+            <span>Ghost Protocol Eligible</span>
+          </div>
+        )}
+
+        <div class="mt-4">
+          <a href={`/ctf/play?ctf=${ctfSlug}`} class="action-button">Continue Playing →</a>
+        </div>
+      </section>
+
+      <!-- Honeytoken Trips -->
+      <section class="terminal-window">
+        <div class="card-header">
+          <h2 class="card-title">Honeytoken Trips</h2>
+          <span class="card-badge" style={status?.honeytoken_trips?.length ? 'color: var(--color-error);' : ''}>
+            {status?.honeytoken_trips?.length || 0} detected
+          </span>
+        </div>
+
+        {status?.honeytoken_trips?.length ? (
+          <ul class="trip-list">
+            {status.honeytoken_trips.map((trip) => (
+              <li class="trip-item">
+                <span class="trip-name">{trip.token_name}</span>
+                <span class="trip-time">{new Date(trip.tripped_at).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="empty-state">No honeytokens tripped. Stay stealthy!</p>
+        )}
+      </section>
+
+      <!-- Achievements -->
+      <section class="terminal-window">
+        <div class="card-header">
+          <h2 class="card-title">Achievements</h2>
+        </div>
+
+        {status?.achievements?.length ? (
+          <ul class="achievement-list">
+            {status.achievements.map((ach) => (
+              <li class="achievement-item">
+                <span class="achievement-icon">{ach.icon || '🏆'}</span>
+                <div class="achievement-info">
+                  <span class="achievement-name">{ach.name}</span>
+                  <span class="achievement-desc">{ach.description}</span>
+                </div>
+                <span class="achievement-points">+{ach.points}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="empty-state">No achievements yet. Keep playing!</p>
+        )}
+      </section>
+
+      <!-- Instances -->
+      <section class="terminal-window">
+        <div class="card-header">
+          <h2 class="card-title">VM Instances</h2>
+          <button type="button" class="register-btn" id="register-instance-btn">
+            + Register Instance
+          </button>
+        </div>
+
+        <!-- Registration Modal (hidden by default) -->
+        <div id="register-modal" class="register-modal" hidden>
+          <div class="register-modal-content">
+            <h3 class="register-modal-title">Register New Instance</h3>
+            <p class="register-modal-desc">
+              Register your VM to enable telemetry tracking. This generates credentials for the honeytoken agent.
+            </p>
+
+            <div id="register-form-container">
+              <label class="register-label">
+                CTF Challenge
+                <select id="register-ctf-select" class="register-select">
+                  <option value="shart-cloud" selected>shart-cloud</option>
+                  <option value="shart-dev">shart-dev</option>
+                  <option value="shart-enterprise">shart-enterprise</option>
+                </select>
+              </label>
+              <button type="button" class="action-button register-submit-btn" id="register-submit-btn">
+                Generate Credentials
+              </button>
+            </div>
+
+            <div id="register-result" class="register-result" hidden>
+              <div class="register-success">Instance registered successfully!</div>
+              <label class="register-label">
+                kubectl command (run this on your VM):
+                <div class="kubectl-command-wrapper">
+                  <code id="kubectl-command" class="kubectl-command"></code>
+                  <button type="button" class="copy-btn" id="copy-kubectl-btn" title="Copy to clipboard">
+                    Copy
+                  </button>
+                </div>
+              </label>
+              <p class="register-warning">
+                Save this command! The secret will not be shown again.
+              </p>
+            </div>
+
+            <button type="button" class="register-close-btn" id="register-close-btn">Close</button>
+          </div>
+        </div>
+
+        {instances.length ? (
+          <ul class="instance-list">
+            {instances.map((inst) => (
+              <li class="instance-item">
+                <div class="instance-info">
+                  <span class="instance-id">{inst.id.slice(0, 8)}...</span>
+                  <span class="instance-ctf">{inst.ctf_slug}</span>
+                </div>
+                <div class="instance-status">
+                  <span class={inst.is_active ? 'status-active' : 'status-inactive'}>
+                    {inst.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  {inst.last_seen_at && (
+                    <span class="instance-seen">Last seen: {new Date(inst.last_seen_at).toLocaleString()}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="empty-state">No instances registered. Click "Register Instance" to get started.</p>
+        )}
+      </section>
+
+      <!-- Leaderboard -->
+      <section class="terminal-window leaderboard-section">
+        <div class="card-header">
+          <h2 class="card-title">Leaderboard</h2>
+          <span class="card-badge">Top 10</span>
+        </div>
+
+        {leaderboard.length ? (
+          <ol class="leaderboard-list">
+            {leaderboard.map((entry) => (
+              <li class="leaderboard-item">
+                <span class="leaderboard-rank">#{entry.rank}</span>
+                <span class="leaderboard-name">{entry.display_name}</span>
+                <span class="leaderboard-points">{entry.total_points} pts</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p class="empty-state">No players on leaderboard yet.</p>
+        )}
+      </section>
+    </div>
+  )}
+</BaseLayout>
+
+<style>
+  .dashboard-grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .leaderboard-section {
+      grid-column: span 2;
+    }
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    margin: 0;
+  }
+
+  .card-badge {
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+    text-transform: uppercase;
+  }
+
+  /* Progress */
+  .progress-container {
+    margin-bottom: 1rem;
+  }
+
+  .progress-bar {
+    height: 8px;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background-color: var(--color-primary);
+    transition: width 0.3s ease;
+  }
+
+  .progress-label {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+    text-align: right;
+  }
+
+  /* Ghost status */
+  .ghost-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-accent);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--color-accent);
+  }
+
+  .ghost-icon {
+    font-size: 1.25rem;
+  }
+
+  /* Action button */
+  .action-button {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: var(--color-primary);
+    color: var(--color-bg);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+    border-radius: 0.25rem;
+    transition: background-color 0.15s;
+  }
+
+  .action-button:hover {
+    background-color: var(--color-primary-bright);
+  }
+
+  /* Lists */
+  .empty-state {
+    font-size: 0.875rem;
+    color: var(--color-primary-subtle);
+    font-style: italic;
+    margin: 0;
+  }
+
+  /* Honeytoken trips */
+  .trip-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .trip-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.875rem;
+  }
+
+  .trip-item:last-child {
+    border-bottom: none;
+  }
+
+  .trip-name {
+    color: var(--color-error);
+  }
+
+  .trip-time {
+    color: var(--color-primary-subtle);
+    font-size: 0.75rem;
+  }
+
+  /* Achievements */
+  .achievement-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .achievement-item:last-child {
+    border-bottom: none;
+  }
+
+  .achievement-icon {
+    font-size: 1.5rem;
+  }
+
+  .achievement-info {
+    flex: 1;
+  }
+
+  .achievement-name {
+    display: block;
+    font-weight: 600;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+  }
+
+  .achievement-desc {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+  }
+
+  .achievement-points {
+    font-weight: 600;
+    color: var(--color-accent);
+    font-size: 0.875rem;
+  }
+
+  /* Instances */
+  .instance-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .instance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.875rem;
+  }
+
+  .instance-item:last-child {
+    border-bottom: none;
+  }
+
+  .instance-id {
+    font-family: monospace;
+    color: var(--color-primary);
+  }
+
+  .instance-ctf {
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+  }
+
+  .instance-status {
+    text-align: right;
+  }
+
+  .status-active {
+    color: var(--color-primary);
+  }
+
+  .status-inactive {
+    color: var(--color-primary-subtle);
+  }
+
+  .instance-seen {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--color-primary-subtle);
+  }
+
+  /* Leaderboard */
+  .leaderboard-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .leaderboard-item:last-child {
+    border-bottom: none;
+  }
+
+  .leaderboard-rank {
+    width: 2rem;
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  .leaderboard-name {
+    flex: 1;
+    color: var(--color-primary);
+  }
+
+  .leaderboard-points {
+    font-weight: 600;
+    color: var(--color-primary-muted);
+  }
+
+  /* Register button */
+  .register-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: transparent;
+    border: 1px solid var(--color-primary);
+    border-radius: 0.25rem;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .register-btn:hover {
+    background-color: var(--color-primary);
+    color: var(--color-bg);
+  }
+
+  /* Registration modal */
+  .register-modal {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-accent);
+    border-radius: 0.375rem;
+  }
+
+  .register-modal[hidden] {
+    display: none;
+  }
+
+  .register-modal-title {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+
+  .register-modal-desc {
+    margin: 0 0 1rem;
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  .register-label {
+    display: block;
+    margin-bottom: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-primary-subtle);
+  }
+
+  .register-select {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    color: var(--color-primary);
+  }
+
+  .register-select:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .register-submit-btn {
+    width: 100%;
+  }
+
+  .register-result {
+    margin-top: 1rem;
+  }
+
+  .register-result[hidden] {
+    display: none;
+  }
+
+  .register-success {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-align: center;
+  }
+
+  .kubectl-command-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .kubectl-command {
+    flex: 1;
+    padding: 0.75rem;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-primary);
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+
+  .copy-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    color: var(--color-primary-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .copy-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .register-warning {
+    margin: 1rem 0 0;
+    padding: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-align: center;
+  }
+
+  .register-close-btn {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    color: var(--color-primary-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .register-close-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+</style>
+
+<script define:vars={{ apiBase }}>
+  const API_BASE = apiBase || (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? `${window.location.protocol}//${window.location.hostname}:8787`
+      : window.location.origin
+  );
+
+  const modal = document.getElementById('register-modal');
+  const openBtn = document.getElementById('register-instance-btn');
+  const closeBtn = document.getElementById('register-close-btn');
+  const submitBtn = document.getElementById('register-submit-btn');
+  const ctfSelect = document.getElementById('register-ctf-select');
+  const formContainer = document.getElementById('register-form-container');
+  const resultContainer = document.getElementById('register-result');
+  const kubectlCommand = document.getElementById('kubectl-command');
+  const copyBtn = document.getElementById('copy-kubectl-btn');
+
+  // Open modal
+  openBtn?.addEventListener('click', () => {
+    modal?.removeAttribute('hidden');
+    formContainer?.removeAttribute('hidden');
+    resultContainer?.setAttribute('hidden', '');
+  });
+
+  // Close modal
+  closeBtn?.addEventListener('click', () => {
+    modal?.setAttribute('hidden', '');
+  });
+
+  // Submit registration
+  submitBtn?.addEventListener('click', async () => {
+    const ctfSlug = ctfSelect?.value || 'shart-cloud';
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Generating...';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ctf/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ctf_slug: ctfSlug }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.kubectl_command) {
+        formContainer?.setAttribute('hidden', '');
+        resultContainer?.removeAttribute('hidden');
+        if (kubectlCommand) {
+          kubectlCommand.textContent = data.kubectl_command;
+        }
+      } else {
+        alert(data.error || 'Failed to register instance');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Generate Credentials';
+      }
+    } catch (err) {
+      alert('Failed to register instance');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Generate Credentials';
+    }
+  });
+
+  // Copy to clipboard
+  copyBtn?.addEventListener('click', async () => {
+    const command = kubectlCommand?.textContent;
+    if (command) {
+      try {
+        await navigator.clipboard.writeText(command);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+        }, 2000);
+      } catch {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = command;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+        }, 2000);
+      }
+    }
+  });
+</script>

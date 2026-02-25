@@ -1,0 +1,21 @@
+{
+  "name": "shart-discord-setup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI to programmatically set up a Discord server (guild) from a YAML config (roles, channels, permissions).",
+  "scripts": {
+    "sync": "tsx src/cli.ts sync",
+    "validate": "tsx src/cli.ts validate",
+    "invite": "tsx src/cli.ts invite"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "yaml": "^2.5.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "shart-labs-worker",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --persist-to=../.wrangler/state",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env dev",
+    "db:migrate": "wrangler d1 execute shart-ctf-db --remote --file=./schema.sql",
+    "db:migrate:local": "wrangler d1 execute shart-ctf-db --local --file=./schema.sql",
+    "db:migrate:dev": "wrangler d1 execute shart-ctf-db-dev --remote --env dev --file=./schema.sql"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.1.0",
+    "@hono/zod-validator": "^0.7.5",
+    "hono": "^4.6.0",
+    "kysely": "^0.27.0",
+    "kysely-d1": "^0.3.0",
+    "nanoid": "^5.0.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.53.0"
+  }
+}

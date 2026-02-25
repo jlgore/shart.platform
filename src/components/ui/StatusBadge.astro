@@ -1,0 +1,46 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+export interface Props extends HTMLAttributes<'span'> {
+  tone?: 'success' | 'accent' | 'muted';
+}
+
+const { tone = 'muted', class: className = '', ...attrs } = Astro.props as Props;
+---
+
+<span class:list={['ui-status-badge', `ui-status-${tone}`, className]} {...attrs}>
+  <slot />
+</span>
+
+<style>
+  .ui-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .ui-status-success {
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+    border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  }
+
+  .ui-status-accent {
+    background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+    color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+
+  .ui-status-muted {
+    background-color: var(--color-border);
+    color: var(--color-primary-subtle);
+    border-color: var(--color-border);
+  }
+</style>

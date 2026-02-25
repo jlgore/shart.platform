@@ -1,0 +1,578 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LabStepNavigation from '../../components/LabStepNavigation.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('labs', ({ data }) => data.draft !== true);
+  return entries.map((entry) => ({
+    params: { slug: entry.slug },
+    props: entry,
+  }));
+}
+
+type Props = CollectionEntry<'labs'>;
+
+const lab = Astro.props as Props;
+const { Content } = await lab.render();
+
+const publishDate = lab.data.publishedDate.toLocaleDateString(undefined, {
+  year: 'numeric', month: 'long', day: 'numeric'
+});
+
+const difficultySymbols: Record<string, string> = {
+  beginner: '●○○',
+  intermediate: '●●○',
+  advanced: '●●●'
+};
+
+// Simulated steps - in production this comes from GitHub API
+const simulatedSteps = [
+  { stepNumber: 1, branchName: 'branch-1-vulnerable', title: 'Vulnerable Setup' },
+  { stepNumber: 2, branchName: 'branch-2-vpc-conditional', title: 'VPC Conditional' },
+  { stepNumber: 3, branchName: 'branch-3-vpc-endpoint', title: 'VPC Endpoint' },
+  { stepNumber: 4, branchName: 'branch-4-file-upload', title: 'File Upload' },
+  { stepNumber: 5, branchName: 'branch-5-network-segmentation', title: 'Network Segmentation' }
+];
+
+const currentStep = 1;
+---
+
+<BaseLayout title={lab.data.title} description={lab.data.description}>
+  <div class="lab-overview">
+    <!-- Breadcrumb -->
+    <nav class="lab-breadcrumb">
+      <a href="/labs" class="lab-breadcrumb__link">LABS</a>
+      <span class="lab-breadcrumb__sep">→</span>
+      <span class="lab-breadcrumb__current">{lab.data.title}</span>
+    </nav>
+
+    <!-- Header Panel -->
+    <header class="lab-header">
+      <div class="lab-header__top">
+        <div class="lab-header__meta">
+          <span class="lab-header__prompt">[LAB]</span>
+          <span class="lab-header__category">{lab.data.category.replace('-', '_').toUpperCase()}</span>
+          <span class="lab-header__difficulty" data-level={lab.data.difficulty}>
+            {difficultySymbols[lab.data.difficulty]} {lab.data.difficulty.toUpperCase()}
+          </span>
+        </div>
+        <div class="lab-header__time">
+          <span class="lab-header__time-icon">◷</span>
+          ~{lab.data.estimatedTime} MIN
+        </div>
+      </div>
+
+      <h1 class="lab-header__title">{lab.data.title}</h1>
+      <p class="lab-header__desc">{lab.data.description}</p>
+
+      <div class="lab-header__tags">
+        {lab.data.tags.map(tag => (
+          <span class="lab-header__tag">#{tag}</span>
+        ))}
+      </div>
+    </header>
+
+    <!-- Info Grid -->
+    <div class="lab-info-grid">
+      <!-- Prerequisites -->
+      <section class="lab-panel">
+        <div class="lab-panel__header">
+          <span class="lab-panel__icon">◆</span>
+          <h2 class="lab-panel__title">PREREQUISITES</h2>
+        </div>
+        <ul class="lab-panel__list">
+          {lab.data.prerequisites.map(prereq => (
+            <li>{prereq}</li>
+          ))}
+        </ul>
+      </section>
+
+      <!-- Learning Objectives -->
+      <section class="lab-panel">
+        <div class="lab-panel__header">
+          <span class="lab-panel__icon">◆</span>
+          <h2 class="lab-panel__title">LEARNING OBJECTIVES</h2>
+        </div>
+        <ul class="lab-panel__list lab-panel__list--objectives">
+          {lab.data.learningObjectives.map((obj, i) => (
+            <li>
+              <span class="lab-panel__obj-num">{String(i + 1).padStart(2, '0')}</span>
+              {obj}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+
+    <!-- Step Navigation -->
+    <LabStepNavigation
+      labSlug={lab.slug}
+      currentStep={currentStep}
+      totalSteps={simulatedSteps.length}
+      steps={simulatedSteps}
+    />
+
+    <!-- Lab Content -->
+    <section class="lab-content">
+      <div class="lab-content__header">
+        <span class="lab-content__prompt">[README]</span>
+        <span class="lab-content__label">LAB DOCUMENTATION</span>
+      </div>
+      <div class="lab-content__body prose">
+        <Content />
+      </div>
+    </section>
+
+    <!-- Actions Footer -->
+    <footer class="lab-actions">
+      <div class="lab-actions__group">
+        <a
+          href={`https://github.com/${lab.data.githubRepo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="lab-actions__btn lab-actions__btn--primary"
+        >
+          <span class="lab-actions__btn-icon">◈</span>
+          OPEN REPOSITORY
+          <span class="lab-actions__external">↗</span>
+        </a>
+        <button id="copy-clone" class="lab-actions__btn" data-repo={lab.data.githubRepo}>
+          <span class="lab-actions__btn-icon">⎘</span>
+          COPY CLONE CMD
+        </button>
+      </div>
+
+      <div class="lab-actions__group">
+        <button id="share-lab" class="lab-actions__btn">
+          <span class="lab-actions__btn-icon">⊕</span>
+          SHARE
+        </button>
+        <a href="/labs" class="lab-actions__btn">
+          <span class="lab-actions__btn-icon">◄</span>
+          ALL LABS
+        </a>
+      </div>
+    </footer>
+
+    <!-- Clone Command Toast -->
+    <div id="clone-toast" class="lab-toast" aria-hidden="true">
+      <code>git clone https://github.com/{lab.data.githubRepo}.git</code>
+      <span class="lab-toast__status">COPIED</span>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .lab-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* Breadcrumb */
+  .lab-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .lab-breadcrumb__link {
+    color: var(--color-primary-muted);
+    text-decoration: none;
+  }
+
+  .lab-breadcrumb__link:hover {
+    color: var(--color-primary);
+  }
+
+  .lab-breadcrumb__sep {
+    color: var(--color-border);
+  }
+
+  .lab-breadcrumb__current {
+    color: var(--color-primary-subtle);
+  }
+
+  /* Header */
+  .lab-header {
+    padding: 1.5rem;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+
+  .lab-header__top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .lab-header__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .lab-header__prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .lab-header__category {
+    color: var(--color-primary-muted);
+  }
+
+  .lab-header__difficulty {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--color-accent);
+  }
+
+  .lab-header__difficulty[data-level="beginner"] {
+    color: var(--color-primary);
+  }
+
+  .lab-header__difficulty[data-level="advanced"] {
+    color: var(--color-error);
+  }
+
+  .lab-header__time {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary-subtle);
+  }
+
+  .lab-header__time-icon {
+    font-size: 0.875rem;
+  }
+
+  .lab-header__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: 0 0 0.75rem;
+    line-height: 1.3;
+  }
+
+  @media (min-width: 640px) {
+    .lab-header__title {
+      font-size: 1.75rem;
+    }
+  }
+
+  .lab-header__desc {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+    line-height: 1.6;
+    margin: 0 0 1rem;
+    max-width: 65ch;
+  }
+
+  .lab-header__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .lab-header__tag {
+    font-size: 0.625rem;
+    color: var(--color-primary-subtle);
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+  }
+
+  /* Info Grid */
+  .lab-info-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 768px) {
+    .lab-info-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .lab-panel {
+    padding: 1.25rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+
+  .lab-panel__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .lab-panel__icon {
+    color: var(--color-accent);
+    font-size: 0.625rem;
+  }
+
+  .lab-panel__title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+  }
+
+  .lab-panel__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--color-primary-muted);
+  }
+
+  .lab-panel__list li {
+    margin-bottom: 0.5rem;
+    padding-left: 1rem;
+    position: relative;
+  }
+
+  .lab-panel__list li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: var(--color-border);
+  }
+
+  .lab-panel__list--objectives li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding-left: 0;
+  }
+
+  .lab-panel__list--objectives li::before {
+    display: none;
+  }
+
+  .lab-panel__obj-num {
+    flex-shrink: 0;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    opacity: 0.7;
+  }
+
+  /* Content */
+  .lab-content {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .lab-content__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .lab-content__prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .lab-content__label {
+    color: var(--color-primary-subtle);
+  }
+
+  .lab-content__body {
+    padding: 1.5rem;
+  }
+
+  .lab-content__body.prose {
+    max-width: none;
+    color: var(--color-primary-muted);
+  }
+
+  .lab-content__body.prose h1,
+  .lab-content__body.prose h2,
+  .lab-content__body.prose h3,
+  .lab-content__body.prose h4 {
+    color: var(--color-primary);
+  }
+
+  .lab-content__body.prose h2::before {
+    content: '## ';
+    color: var(--color-accent);
+  }
+
+  .lab-content__body.prose h3::before {
+    content: '### ';
+    color: var(--color-accent);
+  }
+
+  /* Actions Footer */
+  .lab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .lab-actions__group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .lab-actions__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary-muted);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lab-actions__btn:hover {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .lab-actions__btn--primary {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .lab-actions__btn--primary:hover {
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg));
+    border-color: var(--color-primary);
+  }
+
+  .lab-actions__btn-icon {
+    font-size: 0.75rem;
+  }
+
+  .lab-actions__external {
+    font-size: 0.625rem;
+    opacity: 0.7;
+  }
+
+  /* Toast */
+  .lab-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--color-primary) 20%, transparent);
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .lab-toast[aria-hidden="false"] {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .lab-toast code {
+    color: var(--color-primary);
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .lab-toast__status {
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const copyBtn = document.getElementById('copy-clone');
+    const shareBtn = document.getElementById('share-lab');
+    const toast = document.getElementById('clone-toast');
+
+    function showToast() {
+      if (!toast) return;
+      toast.setAttribute('aria-hidden', 'false');
+      setTimeout(() => {
+        toast.setAttribute('aria-hidden', 'true');
+      }, 2500);
+    }
+
+    copyBtn?.addEventListener('click', () => {
+      const repo = copyBtn.dataset.repo;
+      const command = `git clone https://github.com/${repo}.git`;
+      navigator.clipboard.writeText(command).then(() => {
+        showToast();
+      });
+    });
+
+    shareBtn?.addEventListener('click', () => {
+      if (navigator.share) {
+        navigator.share({
+          title: document.title,
+          url: window.location.href
+        });
+      } else {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+          const original = shareBtn.innerHTML;
+          shareBtn.innerHTML = '<span class="lab-actions__btn-icon">✓</span> LINK COPIED';
+          setTimeout(() => {
+            shareBtn.innerHTML = original;
+          }, 2000);
+        });
+      }
+    });
+  });
+</script>

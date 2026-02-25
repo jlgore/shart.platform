@@ -4,8 +4,12 @@ export interface Props {
   description?: string;
 }
 
-const { title, description = "crappy cloud security training platform" } = Astro.props;
+const { title, description = "Cloud security training platform" } = Astro.props;
 import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+
+// Get user from middleware
+const user = Astro.locals.user;
 ---
 
 <!DOCTYPE html>
@@ -15,34 +19,90 @@ import "../styles/global.css";
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} | SHART.CLOUD</title>
-  </head>
-  <body class="bg-black text-term-green">
-    <nav class="navbar">
-      <div class="navbar-inner">
-        <a class="navbar-brand" href="/">SHART.CLOUD</a>
-        <div class="navbar-links">
-          <a class="navbar-link" href="/blog">Blog</a>
-          <a class="navbar-link" href="/ctf">CTF</a>
-          <a class="navbar-link" href="/about">About</a>
-        </div>
-      </div>
-    </nav>
 
-    <main class="container-page py-10">
+    <!-- Prevent flash of wrong theme -->
+    <script is:inline>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'sage') {
+          document.documentElement.setAttribute('data-theme', 'sage');
+        }
+      })();
+    </script>
+
+    <slot name="head" />
+  </head>
+  <body>
+    <!-- Skip link for keyboard navigation -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <Nav user={user} />
+
+    <main id="main-content" class="container-page py-10">
       <slot />
     </main>
 
-    <footer class="footer">
-      <div class="container-page flex items-center justify-between">
-        <p>&copy; {new Date().getFullYear()} SHART.CLOUD</p>
-        <p>
-          <a class="mr-2" href="/privacy">Privacy</a>
-          <span class="opacity-40">|</span>
-          <a class="mx-2" href="/terms">Terms</a>
-          <span class="opacity-40">|</span>
-          <a class="ml-2" href="https://github.com/shart-cloud">GitHub</a>
-        </p>
+    <footer class="site-footer" role="contentinfo">
+      <div class="footer-inner">
+        <p class="footer-copy">&copy; {new Date().getFullYear()} SHART.CLOUD</p>
+        <nav class="footer-nav" aria-label="Footer navigation">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="https://github.com/shart-cloud">GitHub</a>
+        </nav>
       </div>
     </footer>
   </body>
 </html>
+
+<style>
+  .site-footer {
+    margin-top: 4rem;
+    padding: 1.5rem 0;
+    border-top: none;
+    background-image: linear-gradient(to right, transparent, var(--color-border), transparent);
+    background-size: 100% 1px;
+    background-position: top;
+    background-repeat: no-repeat;
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .footer-inner {
+      flex-direction: row;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+    }
+  }
+
+  .footer-copy {
+    font-size: 0.875rem;
+    color: var(--color-primary-subtle);
+    margin: 0;
+  }
+
+  .footer-nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .footer-nav a {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .footer-nav a:hover {
+    color: var(--color-primary);
+  }
+</style>

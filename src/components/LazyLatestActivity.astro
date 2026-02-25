@@ -1,0 +1,147 @@
+---
+// Lazy-loaded version of LatestActivity with intersection observer
+export interface Props {
+  limit?: number;
+  include?: Array<'blog' | 'labs' | 'ctf'>;
+}
+
+const { limit = 6, include = ['blog', 'labs'] } = Astro.props as Props;
+const id = `lazy-activity-${Math.random().toString(36).substr(2, 9)}`;
+---
+
+<section class="terminal-window" id={id}>
+  <h2 class="text-xl font-bold mb-4">Latest Activity</h2>
+  <div class="activity-placeholder">
+    <p class="text-sm opacity-80">Loading latest activity...</p>
+  </div>
+</section>
+
+<script define:vars={{ id, limit, include }}>
+  const formatTypeLabel = (type) => {
+    if (type === 'lab') return '[Lab]';
+    if (type === 'ctf') return '[CTF]';
+    return '[Blog]';
+  };
+
+  const getSafeHref = (value) => {
+    const href = String(value || '/').trim();
+    if (href.startsWith('/')) {
+      return href.startsWith('//') ? '/' : href;
+    }
+
+    try {
+      const parsed = new URL(href);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.toString();
+      }
+    } catch {
+      return '/';
+    }
+
+    return '/';
+  };
+
+  const renderActivity = (placeholder, activities) => {
+    if (!placeholder) return;
+    placeholder.textContent = '';
+
+    if (!Array.isArray(activities) || activities.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm opacity-80';
+      empty.textContent = 'No recent activity yet.';
+      placeholder.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'space-y-2';
+
+    activities.forEach((item) => {
+      const row = document.createElement('li');
+      row.className = 'flex items-center justify-between';
+
+      const link = document.createElement('a');
+      link.className = 'hover:text-theme-bright';
+      link.href = getSafeHref(item?.href);
+      if (item?.external === true) {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      }
+      const suffix = item?.external === true ? ' ↗' : '';
+      link.textContent = `${formatTypeLabel(item?.type)} ${String(item?.title || '')}${suffix}`;
+
+      const date = document.createElement('span');
+      date.className = 'text-xs text-theme-subtle';
+      date.textContent = new Date(item?.date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC'
+      });
+
+      row.appendChild(link);
+      row.appendChild(date);
+      list.appendChild(row);
+    });
+
+    const links = document.createElement('p');
+    links.className = 'mt-4 text-sm flex gap-4';
+
+    const blogLink = document.createElement('a');
+    blogLink.className = 'hover:text-theme-bright';
+    blogLink.href = '/blog';
+    blogLink.textContent = 'View all posts →';
+    links.appendChild(blogLink);
+
+    const labLink = document.createElement('a');
+    labLink.className = 'hover:text-theme-bright';
+    labLink.href = '/labs';
+    labLink.textContent = 'View all labs →';
+    links.appendChild(labLink);
+
+    if (include.includes('ctf')) {
+      const ctfLink = document.createElement('a');
+      ctfLink.className = 'hover:text-theme-bright';
+      ctfLink.href = '/ctf';
+      ctfLink.textContent = 'View all CTFs →';
+      links.appendChild(ctfLink);
+    }
+
+    placeholder.appendChild(list);
+    placeholder.appendChild(links);
+  };
+
+  // Lazy load activity data when component becomes visible
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(async (entry) => {
+      if (entry.isIntersecting) {
+        observer.unobserve(entry.target);
+
+        try {
+          const response = await fetch(`/api/latest-activity?limit=${limit}&include=${include.join(',')}`);
+          const data = await response.json();
+
+          const placeholder = entry.target.querySelector('.activity-placeholder');
+          if (placeholder && data.activities) {
+            renderActivity(placeholder, data.activities);
+          }
+        } catch (error) {
+          console.error('Failed to load latest activity:', error);
+          const placeholder = entry.target.querySelector('.activity-placeholder');
+          if (placeholder) {
+            placeholder.textContent = '';
+            const errorEl = document.createElement('p');
+            errorEl.className = 'text-sm opacity-80 text-red-400';
+            errorEl.textContent = 'Failed to load activity.';
+            placeholder.appendChild(errorEl);
+          }
+        }
+      }
+    });
+  }, { rootMargin: '50px' });
+
+  const element = document.getElementById(id);
+  if (element) {
+    observer.observe(element);
+  }
+</script>

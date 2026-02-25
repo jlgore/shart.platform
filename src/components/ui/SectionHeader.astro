@@ -1,0 +1,65 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+  class?: string;
+}
+
+const { title, description, class: className = '' } = Astro.props as Props;
+---
+
+<header class:list={['ui-section-header', className]}>
+  <div>
+    <h2 class="ui-section-title">{title}</h2>
+    {description && <p class="ui-section-description">{description}</p>}
+  </div>
+  <div class="ui-section-actions">
+    <slot name="meta" />
+    <slot name="action" />
+  </div>
+</header>
+
+<style>
+  .ui-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+  }
+
+  .ui-section-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .ui-section-description {
+    margin: 0.375rem 0 0;
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+    line-height: 1.5;
+  }
+
+  .ui-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 640px) {
+    .ui-section-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .ui-section-actions {
+      justify-content: flex-start;
+    }
+  }
+</style>

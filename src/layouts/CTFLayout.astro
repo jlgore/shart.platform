@@ -12,12 +12,12 @@ const { title = 'CTF', description = 'Challenge catalog, downloads, and scoreboa
 <BaseLayout title={title} description={description}>
   <header class="mb-8">
     <div class="terminal-header">
-      <span class="text-xs text-term-green/80">ACCESS: PUBLIC</span>
-      <span class="text-xs text-term-green/60">ENV: PRODUCTION</span>
+      <span class="text-xs text-theme-muted">ACCESS: PUBLIC</span>
+      <span class="text-xs text-theme-subtle">ENV: PRODUCTION</span>
     </div>
-    <h1 class="text-2xl font-bold text-term-green uppercase">{title}</h1>
+    <h1 class="text-2xl font-bold text-theme-primary uppercase">{title}</h1>
     {description && (
-      <p class="text-term-green/80 text-sm mt-2">{description}</p>
+      <p class="text-theme-muted text-sm mt-2">{description}</p>
     )}
   </header>
 

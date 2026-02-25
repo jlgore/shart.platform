@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LogAnalyzer from '../../components/LogAnalyzer/LogAnalyzer.tsx';
+import { starterQueryPacks } from '../../lib/queries/packs/starterPack';
+
+const packId = 'starter-vpc-cloudtrail';
+---
+
+<BaseLayout title="Log Lab" description="Run SIEM-style queries over site-provided log packs in your browser.">
+  <section class="container-page space-y-6">
+    <h1 class="text-2xl font-semibold">Log Lab</h1>
+    <p class="text-green-300/70 text-sm">
+      Load curated log packs (hosted by us) and analyze them locally with DuckDB WASM. No uploads, no tracking, just pure packet-sniffing vibes.
+    </p>
+
+    <div class="mt-4">
+      <LogAnalyzer client:only="react" packId={packId} queryPacks={starterQueryPacks} editor="monaco" />
+    </div>
+  </section>
+</BaseLayout>

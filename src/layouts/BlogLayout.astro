@@ -8,6 +8,10 @@ export interface Props {
 
 const { post } = Astro.props;
 const { title, description, date, author, category, tags, readTime } = post.data;
+// Absolute OG image URL for this post
+const siteOrigin = (Astro.site as any)?.origin || (import.meta as any)?.env?.PUBLIC_SITE_URL || '';
+const ogImagePath = `/og/blog/${post.slug}.png`;
+const ogImageUrl = siteOrigin ? `${siteOrigin}${ogImagePath}` : ogImagePath;
 
 const formatDate = (date: Date) => {
   return new Intl.DateTimeFormat('en-US', {
@@ -26,160 +30,207 @@ const categorySymbols = {
 ---
 
 <BaseLayout title={title} description={description}>
-  <article class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+  <Fragment slot="head">
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="article" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="675" />
+    <meta property="og:image:alt" content={title} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content={title} />
+  </Fragment>
+  <article class="blog-article">
     <div class="terminal-window">
       <!-- Post Header -->
-      <div class="terminal-header mb-4">
-        <span class="text-green-400 text-xs">DOCUMENT #{Math.floor(Math.random() * 9999).toString().padStart(4, '0')}</span>
-      </div>
-      
-      <div class="mb-6">
-        <div class="flex items-center gap-3 mb-4 text-xs">
-          <span class="text-amber-400 font-bold">{categorySymbols[category]}</span>
-          <span class="text-green-300">DATE: {formatDate(date)}</span>
-          <span class="text-green-300">TIME: {readTime}min</span>
+      <header class="post-header">
+        <div class="post-meta">
+          <span class="post-category">{categorySymbols[category]}</span>
+          <time datetime={date.toISOString()} class="post-date">
+            {formatDate(date)}
+          </time>
+          <span class="post-reading-time">{readTime} min read</span>
         </div>
-        
-        <pre class="ascii-art text-xs text-green-400 mb-4">
-════════════════════════════════════════════════════════════════════
-        </pre>
-        
-        <h1 class="text-2xl font-bold text-green-400 mb-4 uppercase">
-          {title}
-        </h1>
-        
-        <p class="text-green-300 mb-4 text-sm">
-          &gt; {description}
-        </p>
-        
-        <div class="flex items-center justify-between mb-6">
-          <div class="text-xs">
-            <span class="text-green-400">AUTHOR: </span>
-            <span class="text-green-300">{author.toUpperCase()}</span>
-          </div>
-          
-          <div class="flex gap-2 flex-wrap">
+
+        <h1 class="post-title">{title}</h1>
+
+        <p class="post-description">{description}</p>
+
+        <div class="post-author-tags">
+          <span class="post-author">
+            By <strong>{author}</strong>
+          </span>
+
+          <nav class="post-tags" aria-label="Post tags">
             {tags.map((tag) => (
-              <a 
-                href={`/blog/tags/${tag}`}
-                class="text-xs text-green-400 hover:text-green-300"
-              >
-                #{tag}
-              </a>
+              <a href={`/blog/tags/${tag}`} class="post-tag">#{tag}</a>
             ))}
-          </div>
+          </nav>
         </div>
-        
-        <pre class="ascii-art text-xs text-green-400 mb-6">
-════════════════════════════════════════════════════════════════════
-        </pre>
-      </div>
-      
+      </header>
+
+      <hr class="post-divider" aria-hidden="true" />
+
       <!-- Post Content -->
-      <div class="prose prose-terminal max-w-none text-green-400">
-        <style>
-          .prose-terminal {
-            color: #33ff33;
-          }
-          .prose-terminal h2,
-          .prose-terminal h3,
-          .prose-terminal h4 {
-            color: #33ff33;
-            text-transform: uppercase;
-            font-weight: bold;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            text-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
-          }
-          .prose-terminal h2::before {
-            content: '## ';
-            color: #ffb000;
-          }
-          .prose-terminal h3::before {
-            content: '### ';
-            color: #ffb000;
-          }
-          .prose-terminal p {
-            margin-bottom: 1rem;
-            line-height: 1.6;
-          }
-          .prose-terminal a {
-            color: #33ff33;
-            text-decoration: underline;
-            text-decoration-style: dotted;
-          }
-          .prose-terminal a:hover {
-            text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
-          }
-          .prose-terminal code {
-            background: black;
-            border: 1px solid #33ff33;
-            color: #33ff33;
-            padding: 0.125rem 0.375rem;
-            font-size: 0.875rem;
-            text-shadow: 0 0 5px rgba(51, 255, 51, 0.3);
-          }
-          .prose-terminal pre {
-            background: black !important;
-            border: 2px solid #33ff33 !important;
-            color: #33ff33 !important;
-            padding: 1rem;
-            overflow-x: auto;
-            margin: 1.5rem 0;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-          }
-          .prose-terminal pre code {
-            background: transparent;
-            border: none;
-            padding: 0;
-          }
-          .prose-terminal blockquote {
-            border-left: 4px solid #ffb000;
-            padding-left: 1rem;
-            color: #ffb000;
-            font-style: normal;
-            margin: 1.5rem 0;
-          }
-          .prose-terminal ul,
-          .prose-terminal ol {
-            margin: 1rem 0;
-            padding-left: 2rem;
-          }
-          .prose-terminal li {
-            margin: 0.5rem 0;
-          }
-          .prose-terminal li::marker {
-            color: #ffb000;
-          }
-          .prose-terminal strong {
-            color: #ffb000;
-            text-shadow: 0 0 5px rgba(255, 176, 0, 0.5);
-          }
-          .prose-terminal em {
-            color: #33ff33;
-            font-style: normal;
-            text-decoration: underline;
-            text-decoration-style: wavy;
-          }
-        </style>
+      <div class="prose prose-terminal">
         <slot />
       </div>
-      
+
       <!-- Post Footer -->
-      <div class="mt-12 pt-6 border-t-2 border-green-400">
-        <pre class="ascii-art text-xs text-green-400 text-center mb-4">
-═══════════════[ END OF DOCUMENT ]═══════════════
-        </pre>
-        
-        <div class="text-center text-xs text-green-300">
-          <div class="terminal-prompt mb-2">
-            EOF
-          </div>
-          <a href="/blog" class="text-green-400 hover:text-green-300">
-            &lt;&lt; RETURN TO BLOG DATABASE
+      <footer class="post-footer">
+        <nav class="post-nav">
+          <a href="/blog" class="back-link">
+            ← Back to all posts
           </a>
-        </div>
-      </div>
+        </nav>
+      </footer>
     </div>
   </article>
 </BaseLayout>
+
+<style>
+  /* Blog article container */
+  .blog-article {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .blog-article {
+      padding: 3rem 1.5rem;
+    }
+  }
+
+  /* Post header */
+  .post-header {
+    margin-bottom: 2rem;
+  }
+
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+    color: var(--color-primary-muted);
+  }
+
+  .post-category {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .post-title {
+    font-size: 1.875rem;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: 0 0 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  @media (min-width: 640px) {
+    .post-title {
+      font-size: 2.25rem;
+    }
+  }
+
+  .post-description {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--color-primary-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .post-author-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .post-author {
+    color: var(--color-primary-muted);
+  }
+
+  .post-author strong {
+    color: var(--color-primary);
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .post-tag {
+    color: var(--color-primary-subtle);
+    text-decoration: none;
+    font-size: 0.75rem;
+  }
+
+  .post-tag:hover {
+    color: var(--color-primary);
+  }
+
+  /* Divider */
+  .post-divider {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 2rem 0;
+  }
+
+  /* Prose terminal styles - only terminal-specific overrides */
+  .prose-terminal {
+    max-width: none;
+  }
+
+  .prose-terminal h2::before {
+    content: '## ';
+    color: var(--color-accent);
+  }
+
+  .prose-terminal h3::before {
+    content: '### ';
+    color: var(--color-accent);
+  }
+
+  .prose-terminal h4::before {
+    content: '#### ';
+    color: var(--color-accent);
+  }
+
+  .prose-terminal pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  /* Post footer */
+  .post-footer {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .back-link {
+    color: var(--color-primary-muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+</style>

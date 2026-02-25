@@ -1,0 +1,200 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/auth/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+---
+
+<BaseLayout title="Lab History" description="Your completed labs">
+  <meta name="user-id" content={user.id} slot="head" />
+  <script define:vars={{ userId: user.id }} is:inline>
+    window.__LAB_USER_ID = userId;
+  </script>
+  <div id="history-root">
+    <div id="history-header">
+      <h1>Lab History</h1>
+      <p id="history-subtitle">Your completed lab sessions</p>
+    </div>
+
+    <div id="history-content">
+      <div id="history-loading">Loading...</div>
+      <div id="history-error" style="display:none"></div>
+      <div id="history-empty" style="display:none">No completed labs yet. <a href="/labs">Start one →</a></div>
+      <table id="history-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Lab</th>
+            <th>Score</th>
+            <th>Checks</th>
+            <th>Completed</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  #history-root {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #history-header {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--color-border, #222);
+    padding-bottom: 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    color: var(--color-primary, #0ff);
+    margin: 0 0 0.25rem;
+  }
+
+  #history-subtitle {
+    color: #666;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  #history-loading,
+  #history-error,
+  #history-empty {
+    color: #666;
+    font-size: 0.9rem;
+    padding: 2rem 0;
+  }
+
+  #history-error {
+    color: var(--color-error, #f87171);
+  }
+
+  #history-empty a {
+    color: var(--color-primary, #0ff);
+    text-decoration: none;
+  }
+
+  #history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    color: #888;
+    font-weight: 400;
+    border-bottom: 1px solid var(--color-border, #222);
+  }
+
+  td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #1a1a1a;
+    color: #ccc;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  .score-perfect {
+    color: #4ade80;
+    font-weight: 600;
+  }
+
+  .score-partial {
+    color: #facc15;
+  }
+
+  .score-zero {
+    color: var(--color-error, #f87171);
+  }
+
+  .lab-id {
+    color: var(--color-primary, #0ff);
+  }
+</style>
+
+<script>
+  // @ts-nocheck
+  const LAB_API = import.meta.env.PUBLIC_LAB_WORKER_URL ?? 'https://labs.shart.cloud';
+
+  const $loading = document.getElementById('history-loading');
+  const $error   = document.getElementById('history-error');
+  const $empty   = document.getElementById('history-empty');
+  const $table   = document.getElementById('history-table');
+  const $tbody   = document.getElementById('history-tbody');
+
+  function formatDate(unixSeconds) {
+    return new Date(unixSeconds * 1000).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function scoreClass(score) {
+    if (score >= 1)   return 'score-perfect';
+    if (score >= 0.5) return 'score-partial';
+    return 'score-zero';
+  }
+
+  async function loadHistory() {
+    // Parse userId from the session cookie — the session ID is stored server-side,
+    // but we can get the userId from the session via the API.
+    // Use the completions endpoint with a placeholder; server validates the token.
+    const userId = window.__LAB_USER_ID;
+
+    if (!userId) {
+      $loading.style.display = 'none';
+      $error.textContent = 'Could not determine user ID. Please refresh.';
+      $error.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${LAB_API}/api/labs/completions/${userId}`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const completions = data.completions ?? [];
+
+      $loading.style.display = 'none';
+
+      if (completions.length === 0) {
+        $empty.style.display = 'block';
+        return;
+      }
+
+      for (const c of completions) {
+        const pct = c.checks_total > 0 ? Math.round((c.checks_passed / c.checks_total) * 100) : 0;
+        const cls = scoreClass(c.score);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="lab-id">${c.lab_id}</td>
+          <td class="${cls}">${pct}%</td>
+          <td>${c.checks_passed}/${c.checks_total}</td>
+          <td>${formatDate(c.completed_at)}</td>
+        `;
+        $tbody.appendChild(tr);
+      }
+
+      $table.style.display = 'table';
+    } catch (err) {
+      $loading.style.display = 'none';
+      $error.textContent = `Failed to load history: ${err.message}`;
+      $error.style.display = 'block';
+    }
+  }
+
+  loadHistory();
+</script>

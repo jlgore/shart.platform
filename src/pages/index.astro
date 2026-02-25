@@ -1,49 +1,258 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCollection } from 'astro:content';
+import LazyLatestActivity from '../components/LazyLatestActivity.astro';
+import DataCard from '../components/ui/DataCard.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import { eventHref, formatEventDateRange, getUpcomingEvents } from '../lib/events';
 
-const allPosts = await getCollection('blog', ({ data }) => {
-  return data.draft !== true;
-});
-
-const latestPosts = allPosts
-  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
-  .slice(0, 3);
+const [nextEvent] = await getUpcomingEvents(1);
 ---
 
 <BaseLayout title="Home">
-  <section class="mb-10">
-    <h1 class="text-3xl font-bold text-term-green uppercase">SHART.CLOUD</h1>
-    <p class="text-term-green/80 mt-2">Cloud security education done in a 💩 way.</p>
-
-    <div class="mt-4 flex gap-4 text-sm">
-      <a class="navbar-link" href="/ctf">CTFs</a>
-      <a class="navbar-link" href="/blog">Blog</a>
+  <!-- Hero Section -->
+  <DataCard as="section" class="hero" hover={false} style="--card-padding: 2.5rem 2rem 2.5rem">
+    <div class="hero-main">
+      <p class="hero-eyebrow">Cloud Security Playground</p>
+      <h1 class="hero-title">
+        SHART<span class="hero-dot">.</span>CLOUD
+      </h1>
+      <p class="hero-subtitle">
+        Cloud security education done differently. Learn through hands-on CTF challenges,
+        practical labs, and irreverent writeups that still teach real skills.
+      </p>
+      <div class="hero-actions">
+        <a href="/ctf" class="hero-btn hero-btn-primary">Capture The Flag</a>
+        <a href="/labs" class="hero-btn hero-btn-secondary">Security Labs</a>
+        <a href="/blog" class="hero-btn hero-btn-secondary">Read Blog</a>
+      </div>
     </div>
+  </DataCard>
+
+  <section class="home-section home-section-live">
+    <SectionHeader
+      title="Live Signal"
+      description="Latest event where the team is speaking, streaming, or shipping chaos."
+    />
+
+    {nextEvent ? (
+      <DataCard as="article" class="live-card" style="--card-padding: 1.5rem 1.25rem">
+        <p class="live-card__meta">{formatEventDateRange(nextEvent.data.startDate, nextEvent.data.endDate)}</p>
+        <h3 class="live-card__title">
+          <a href={eventHref(nextEvent)}>{nextEvent.data.title}{nextEvent.data.url ? ' ↗' : ''}</a>
+        </h3>
+        {nextEvent.data.description && <p class="live-card__desc">{nextEvent.data.description}</p>}
+      </DataCard>
+    ) : (
+      <DataCard as="article" class="live-card" hover={false} style="--card-padding: 1.5rem 1.25rem">
+        <p class="live-card__meta">No upcoming events</p>
+        <h3 class="live-card__title">Quiet on the wire (for now)</h3>
+        <p class="live-card__desc">Check back soon, or browse the event archive for past talks and streams.</p>
+      </DataCard>
+    )}
   </section>
 
-  {latestPosts.length > 0 && (
-    <section class="terminal-window">
-      <h2 class="text-xl font-bold mb-4">Recent Posts</h2>
-
-      <ul class="space-y-2">
-        {latestPosts.map((post) => (
-          <li class="flex items-center justify-between">
-            <a class="hover:text-term-green-dark" href={`/blog/${post.slug}`}>
-              {post.data.title}
-            </a>
-            <span class="text-xs text-term-green/70">
-              {new Date(post.data.date).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <p class="mt-4 text-sm"><a class="hover:text-term-green-dark" href="/blog">View all posts →</a></p>
-    </section>
-  )}
+  <section class="home-section home-section-drops">
+    <SectionHeader
+      title="Recent Drops"
+      description="New blog posts and lab content from the training pipeline."
+    />
+    <LazyLatestActivity limit={6} include={["blog", "labs"]} />
+  </section>
 </BaseLayout>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 3.25rem;
+    background:
+      radial-gradient(circle at 85% 15%, color-mix(in srgb, var(--color-accent) 15%, transparent), transparent 40%),
+      radial-gradient(circle at 12% 85%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 45%),
+      var(--color-bg-elevated);
+    animation: hero-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    right: -5rem;
+    top: -4rem;
+    width: min(32vw, 20rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--color-primary) 32%, transparent), transparent 62%),
+      radial-gradient(circle at 70% 65%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 70%);
+    opacity: 0.55;
+    pointer-events: none;
+    filter: blur(8px);
+  }
+
+  @keyframes hero-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(2px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  .hero-eyebrow {
+    margin: 0 0 0.875rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .hero-main {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    max-width: 56ch;
+  }
+
+  .hero-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2.25rem, 5.5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--color-primary);
+    text-shadow: 0 0 40px color-mix(in srgb, var(--color-primary) 35%, transparent),
+                 0 0 80px color-mix(in srgb, var(--color-primary) 15%, transparent);
+    margin: 0 0 1.1rem;
+    line-height: 1.1;
+  }
+
+  .hero-dot {
+    color: var(--color-primary-bright);
+  }
+
+  .hero-subtitle {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: var(--color-primary-muted);
+    max-width: 52ch;
+    margin: 0 0 1.75rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+  }
+
+  .hero-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 0.25rem;
+    transition: all 0.25s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .hero-btn-primary {
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border: 1px solid var(--color-primary);
+  }
+
+  .hero-btn-primary:hover {
+    background: var(--color-primary-bright);
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 30px -2px color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .hero-btn-secondary {
+    background: transparent;
+    color: var(--color-primary-muted);
+    border: 1px solid var(--color-border);
+  }
+
+  .hero-btn-secondary:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary-muted);
+    box-shadow: 0 0 24px -4px color-mix(in srgb, var(--color-primary) 25%, transparent);
+  }
+
+  .home-section {
+    margin-bottom: 2.85rem;
+  }
+
+  .home-section-live {
+    margin-top: 2.5rem;
+  }
+
+  .live-card {
+    /* padding set via --card-padding on the element */
+  }
+
+  .live-card__meta {
+    margin: 0 0 0.4rem;
+    font-size: 0.69rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .live-card__title {
+    margin: 0 0 0.45rem;
+    font-size: 1rem;
+    line-height: 1.35;
+  }
+
+  .live-card__title a {
+    text-decoration: none;
+    color: var(--color-primary);
+  }
+
+  .live-card__title a:hover {
+    color: var(--color-primary-bright);
+  }
+
+  .live-card__desc {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--color-primary-muted);
+  }
+
+  :global(.home-section .terminal-window) {
+    margin-bottom: 0;
+  }
+
+  :global(.home-section-drops .ui-section-header) {
+    margin-bottom: 1.9rem;
+  }
+
+  @media (max-width: 640px) {
+    .hero {
+      padding: 2rem 1.25rem 2rem;
+      margin-bottom: 2.4rem;
+    }
+
+    .hero::after {
+      right: -7rem;
+      top: -6rem;
+      width: 16rem;
+      opacity: 0.4;
+    }
+
+    .home-section {
+      margin-bottom: 2.35rem;
+    }
+
+    :global(.home-section-drops .ui-section-header) {
+      margin-bottom: 1.6rem;
+    }
+  }
+</style>

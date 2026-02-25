@@ -1,0 +1,8 @@
+cloudflare_account_id = "11caecd272df7dbdcc636034c25b1f1c"
+d1_database_name = "shart-database-dev"
+cloudflare_account_token="1C7HDgywxqLeda7fesW7p2S7QpYheXyFeXjMjE5e"
+environment="dev"
+shart_cloud_zone_id="cd8131945eea79cfdc75421731d7553d"
+supabase_access_token="sbp_59f0975240d3417a13ae24e94d3e6b22a9f602d5"
+supabase_org_id="pljwitchnwaawdyksats"
+database_password="$uP@B@s3P255w0Rd!"

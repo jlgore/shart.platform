@@ -1,0 +1,611 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import LabStepNavigation from '../../../../components/LabStepNavigation.astro';
+import { GitHubBranchDiscovery, GitHubREADMEFetcher } from '../../../../lib/github/index.js';
+import { sanitizeHtml } from '../../../../lib/sanitize-html.js';
+
+export async function getStaticPaths() {
+  const labs = await getCollection('labs', ({ data }) => data.draft !== true);
+
+  const paths: any[] = [];
+
+  for (const lab of labs) {
+    try {
+      const token = (import.meta as any).env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+      const api = new GitHubBranchDiscovery({ token });
+      const readme = new GitHubREADMEFetcher({ token });
+
+      // Fetch branches then compute steps by pattern
+      const pattern = lab.data.branchPattern || 'branch-{step}-*';
+      const branches = await api.fetchAllBranches(lab.data.githubRepo);
+      const stepBranches = branches
+        .filter(b => api.matchesPattern(b.name, pattern))
+        .map(b => ({
+          stepNumber: api.extractStepNumber(b.name, pattern)!,
+          branchName: b.name
+        }))
+        .sort((a, b) => a.stepNumber - b.stepNumber);
+
+      const toTitle = (branchName: string) =>
+        branchName.replace(/^branch-\d+-/, '').replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+
+      for (const step of stepBranches) {
+        let readmeHtml = '';
+        try {
+          const raw = await readme.fetchREADMEHtml(lab.data.githubRepo, step.branchName);
+          readmeHtml = await sanitizeHtml(raw);
+        } catch (e) {
+          readmeHtml = `<div class=\"prose prose-invert\"><p><em>Unable to load README for ${step.branchName}.</em></p></div>`;
+        }
+
+        paths.push({
+          params: { slug: lab.slug, stepNumber: String(step.stepNumber) },
+          props: {
+            lab,
+            stepNumber: step.stepNumber,
+            totalSteps: stepBranches.length,
+            steps: stepBranches.map(s => ({ stepNumber: s.stepNumber, branchName: s.branchName, title: toTitle(s.branchName) })),
+            readmeHtml,
+            currentBranchName: step.branchName,
+            currentTitle: toTitle(step.branchName)
+          }
+        });
+      }
+    } catch (err) {
+      const fallbackSteps = [
+        { stepNumber: 1, branchName: 'branch-1-vulnerable', title: 'Vulnerable Setup' },
+        { stepNumber: 2, branchName: 'branch-2-vpc-conditional', title: 'VPC Conditional' },
+        { stepNumber: 3, branchName: 'branch-3-vpc-endpoint', title: 'VPC Endpoint' },
+        { stepNumber: 4, branchName: 'branch-4-file-upload', title: 'File Upload' },
+        { stepNumber: 5, branchName: 'branch-5-network-segmentation', title: 'Network Segmentation' }
+      ];
+
+      for (const step of fallbackSteps) {
+        paths.push({
+          params: { slug: lab.slug, stepNumber: String(step.stepNumber) },
+          props: {
+            lab,
+            stepNumber: step.stepNumber,
+            totalSteps: fallbackSteps.length,
+            steps: fallbackSteps,
+            readmeHtml: await sanitizeHtml('<div class="prose prose-invert"><p><em>README content will appear here once GitHub API access is available during build.</em></p></div>'),
+            currentBranchName: step.branchName,
+            currentTitle: step.title
+          }
+        });
+      }
+    }
+  }
+
+  return paths;
+}
+
+interface Props {
+  lab: CollectionEntry<'labs'>;
+  stepNumber: number;
+  totalSteps: number;
+  steps: { stepNumber: number; branchName: string; title: string }[];
+  readmeHtml: string;
+  currentBranchName: string;
+  currentTitle: string;
+}
+
+const { lab, stepNumber, totalSteps, steps, readmeHtml, currentBranchName, currentTitle } = Astro.props as Props;
+
+const currentStepData = { branchName: currentBranchName, title: currentTitle };
+const allSteps = steps.map(s => ({ stepNumber: s.stepNumber, branchName: s.branchName, title: s.title }));
+
+const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
+---
+
+<BaseLayout title={pageTitle} description={`${lab.data.description} - Step ${stepNumber}: ${currentStepData.title}`}>
+  <main class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <a href="/labs" class="hover:text-theme-bright">Labs</a>
+      <span>→</span>
+      <a href={`/labs/${lab.slug}`} class="hover:text-theme-bright">{lab.data.title}</a>
+      <span>→</span>
+      <span>Step {stepNumber}</span>
+    </nav>
+
+    <!-- Lab Header -->
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">{lab.data.title}</h1>
+      <h2 class="text-xl text-theme-primary mb-4">Step {stepNumber}: {currentStepData.title}</h2>
+
+      <div class="flex items-center gap-4 text-sm text-gray-400">
+        <span>Branch: <code class="font-mono text-theme-primary">{currentStepData.branchName}</code></span>
+        <a
+          href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-theme-bright"
+        >
+          View on GitHub ↗
+        </a>
+      </div>
+    </header>
+
+    <!-- Step Navigation -->
+    <LabStepNavigation
+      labSlug={lab.slug}
+      currentStep={stepNumber}
+      totalSteps={totalSteps}
+      steps={allSteps}
+    />
+
+    <!-- Step Content -->
+    <article class="mb-8">
+      <div class="border border-theme-primary/30 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-semibold mb-4">Step {stepNumber}: {currentStepData.title}</h3>
+
+        <!-- Lab Variables: paste Terraform output and define placeholders -->
+        <section id="lab-vars-panel" data-lab-slug={lab.slug} class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-semibold">Lab Variables</h4>
+            <button id="toggle-lab-vars" class="px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" aria-expanded="true" aria-controls="lab-vars-content">Hide</button>
+          </div>
+          <p class="text-sm text-gray-300 mb-3">
+            Paste your Terraform outputs (raw or <code>terraform output -json</code>). We'll replace placeholders like
+            <code>&lt;WEB_SERVER_PUBLIC_IP&gt;</code> in the commands below.
+          </p>
+          <div id="lab-vars-content" class="space-y-2">
+            <textarea id="tf-output" class="w-full bg-black border border-gray-600 rounded p-2 text-sm font-mono" rows="4" placeholder="terraform output or terraform output -json"></textarea>
+            <div class="flex gap-2">
+              <button id="btn-parse-tf" class="px-3 py-1 text-xs border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10">Parse Outputs</button>
+              <button id="btn-apply-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Apply to Commands</button>
+              <button id="btn-clear-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Clear</button>
+            </div>
+            <div id="vars-list" class="grid md:grid-cols-2 gap-2"></div>
+            <p class="text-xs text-gray-400">Values are stored locally in your browser for this lab.</p>
+          </div>
+        </section>
+
+        <!-- Render README content from GitHub as HTML -->
+        <div
+          id="readme-container"
+          class="prose prose-invert max-w-none"
+          data-repo={lab.data.githubRepo}
+          data-branch={currentStepData.branchName}
+          set:html={readmeHtml}
+        ></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="border border-gray-600 rounded-lg p-4">
+          <h4 class="font-semibold mb-2">Git Commands</h4>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <code class="bg-gray-800 px-2 py-1 rounded text-xs">git checkout {currentStepData.branchName}</code>
+              <button class="copy-btn px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" data-copy="git checkout {currentStepData.branchName}">
+                Copy
+              </button>
+            </div>
+            <div class="flex items-center justify-between">
+              <code class="bg-gray-800 px-2 py-1 rounded text-xs">git pull origin {currentStepData.branchName}</code>
+              <button class="copy-btn px-2 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700" data-copy="git pull origin {currentStepData.branchName}">
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="border border-gray-600 rounded-lg p-4">
+          <h4 class="font-semibold mb-2">Step Navigation</h4>
+          <div class="flex gap-2">
+            {stepNumber > 1 && (
+              <a
+                href={`/labs/${lab.slug}/step/${stepNumber - 1}`}
+                class="px-3 py-1 text-sm border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+              >
+                ← Previous
+              </a>
+            )}
+            {stepNumber < totalSteps && (
+              <a
+                href={`/labs/${lab.slug}/step/${stepNumber + 1}`}
+                class="px-3 py-1 text-sm border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10 transition-colors"
+              >
+                Next →
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <!-- Bug Report Notice -->
+      <div class="mt-6 border border-theme-primary/30 rounded-lg p-4 bg-theme-primary/5">
+        <p class="text-sm text-gray-300">
+          Found a bug or issue with this lab step?
+          <a
+            href={`https://github.com/${lab.data.githubRepo}/issues`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-theme-primary hover:text-theme-bright underline"
+          >
+            Open an issue on GitHub ↗
+          </a>
+        </p>
+      </div>
+    </article>
+
+    <!-- Navigation Footer -->
+    <footer class="border-t border-gray-700 pt-6">
+      <div class="flex items-center justify-between">
+        <a
+          href={`/labs/${lab.slug}`}
+          class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+        >
+          ← Back to Lab Overview
+        </a>
+
+        <div class="flex gap-2">
+          <a
+            href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-4 py-2 border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10 transition-colors"
+          >
+            View Branch on GitHub ↗
+          </a>
+          <a
+            href="/labs"
+            class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors"
+          >
+            All Labs
+          </a>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Embed variable schema for client-side use -->
+  <script type="application/json" id="lab-vars-schema">{JSON.stringify(lab.data.variables || [])}</script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const expectedSchema = (() => {
+        const node = document.getElementById('lab-vars-schema');
+        if (!node) return [];
+        try { return JSON.parse(node.textContent || '[]'); } catch { return []; }
+      })();
+      // --- Lab variable replacement ---
+      const panel = document.getElementById('lab-vars-panel');
+      const labSlug = panel?.getAttribute('data-lab-slug') || 'unknown';
+      const storageKey = `labVars:${labSlug}`;
+      const readme = document.getElementById('readme-container');
+      const varsList = document.getElementById('vars-list');
+      const tfTextarea = document.getElementById('tf-output') as HTMLTextAreaElement | null;
+      const btnParse = document.getElementById('btn-parse-tf');
+      const btnApply = document.getElementById('btn-apply-vars');
+      const btnClear = document.getElementById('btn-clear-vars');
+      const varsContent = document.getElementById('lab-vars-content');
+      const varsToggle = document.getElementById('toggle-lab-vars');
+      const collapsedKey = `labVarsCollapsed:${labSlug}`;
+
+      type VarsMap = Record<string, string>;
+
+      function loadVars(): VarsMap {
+        try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+      }
+      function saveVars(obj: VarsMap) {
+        localStorage.setItem(storageKey, JSON.stringify(obj || {}));
+      }
+
+      function toVarKey(k: string | null | undefined): string {
+        return String(k || '')
+          .trim()
+          .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
+          .replace(/[^A-Za-z0-9]+/g, '_')
+          .toUpperCase();
+      }
+
+      function detectPlaceholders(): Set<string> {
+        const keys = new Set<string>();
+        if (!readme) return keys;
+        readme.querySelectorAll('code').forEach((el) => {
+          const t = el.textContent || '';
+          // Accept upper/lowercase for placeholder tokens inside <...>
+          const re = /<([A-Za-z0-9_\-.:]+)>/g;
+          let m; while ((m = re.exec(t)) !== null) { keys.add(toVarKey(m[1])); }
+        });
+        return keys;
+      }
+
+      function renderVarInputs(varsMap: VarsMap, expectedKeys: Set<string> | string[]) {
+        if (!varsList) return;
+        varsList.innerHTML = '';
+        const schemaKeys = Array.isArray(expectedSchema) ? expectedSchema.map((v: any) => (v && v.key ? String(v.key) : '')).filter(Boolean).map(toVarKey) : [];
+        const keys = Array.from(new Set([...(expectedKeys || []), ...schemaKeys, ...Object.keys(varsMap || {})])).sort();
+        for (const k of keys) {
+          const id = `var-${k}`;
+          const value = varsMap[k] ?? '';
+          const wrap = document.createElement('div');
+          wrap.className = 'flex items-center gap-2';
+          const label = document.createElement('label');
+          label.htmlFor = id;
+          label.className = 'text-xs text-gray-400 min-w-[10rem]';
+          label.textContent = k;
+
+          const input = document.createElement('input');
+          input.id = id;
+          input.setAttribute('data-var-key', k);
+          input.className = 'flex-1 bg-black border border-gray-600 rounded p-1 text-sm font-mono';
+          input.value = String(value);
+
+          wrap.appendChild(label);
+          wrap.appendChild(input);
+          varsList.appendChild(wrap);
+        }
+      }
+
+      function collectVarsFromInputs(): VarsMap {
+        const map: VarsMap = {};
+        varsList?.querySelectorAll('input[data-var-key]').forEach((inp) => {
+          const key = inp.getAttribute('data-var-key');
+          if (!key) return;
+          map[key] = (inp as HTMLInputElement).value.trim();
+        });
+        return map;
+      }
+
+      function applyVars(map: VarsMap) {
+        if (!readme) return;
+        const keys = Object.keys(map || {});
+        if (keys.length === 0) return;
+        const codeEls = readme.querySelectorAll('code');
+        codeEls.forEach((el) => {
+          // Backup original content once
+          if (!(el as any)._orig) {
+            (el as any)._orig = el.textContent || '';
+          }
+          let t = (el as any)._orig;
+          // Resolve any <TOKEN> where TOKEN may include letters, '.', ':' or '_'
+          const tokenRe = /<([A-Za-z0-9_\-.:]+)>/g;
+          const seen = new Set();
+          let m;
+          while ((m = tokenRe.exec(t)) !== null) {
+            const raw = m[1];
+            if (seen.has(raw)) continue;
+            seen.add(raw);
+            const norm = toVarKey(raw);
+            const val = map[norm];
+            if (!val) continue;
+            t = t.replace(new RegExp(`<${raw}>`, 'g'), val);
+          }
+          el.textContent = t;
+        });
+      }
+
+      function parseTerraformOutputs(text: string): VarsMap {
+        const out: VarsMap = {};
+        if (!text) return out;
+        const trimmed = text.trim();
+        // JSON mode from `terraform output -json`
+        if (trimmed.startsWith('{')) {
+          try {
+            const obj = JSON.parse(trimmed);
+            for (const k of Object.keys(obj)) {
+              const entry = obj[k];
+              let val = entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+              if (Array.isArray(val)) val = val.join(',');
+              if (val && typeof val === 'object' && !Array.isArray(val)) {
+                // Store JSON string for full map
+                out[toVarKey(k)] = JSON.stringify(val);
+                // Also flatten first-level keys
+                for (const sk of Object.keys(val)) {
+                  const fk = `${toVarKey(k)}_${toVarKey(sk)}`;
+                  const v = val[sk];
+                  out[fk] = Array.isArray(v) || (v && typeof v === 'object') ? JSON.stringify(v) : String(v ?? '');
+                }
+              } else {
+                out[toVarKey(k)] = String(val ?? '');
+              }
+            }
+            return out;
+          } catch (e) {
+            // fallthrough to line mode
+          }
+        }
+        // Line mode from `terraform output`
+        const lines = trimmed.split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const m = line.match(/^\s*([A-Za-z0-9_\-]+)\s*=\s*(.+)$/);
+          if (!m) continue;
+          const key = toVarKey(m[1]);
+          let valRaw = m[2].trim();
+          // Map/object block starting with '{'
+          if (valRaw === '{' || valRaw.startsWith('{')) {
+            const blockLines = [];
+            let rest = '';
+            if (valRaw !== '{') {
+              rest = valRaw.slice(valRaw.indexOf('{') + 1);
+              if (rest && rest.trim()) blockLines.push(rest);
+            }
+            let depth = 1;
+            for (i = i + 1; i < lines.length; i++) {
+              const ln = lines[i];
+              const open = (ln.match(/\{/g) || []).length;
+              const close = (ln.match(/\}/g) || []).length;
+              depth += open - close;
+              if (depth <= 0) {
+                const beforeClose = ln.slice(0, ln.lastIndexOf('}'));
+                if (beforeClose && beforeClose.trim()) blockLines.push(beforeClose);
+                break;
+              } else {
+                blockLines.push(ln);
+              }
+            }
+            const obj: Record<string, any> = {};
+            for (const bl of blockLines) {
+              const lineTrim = bl.trim();
+              if (!lineTrim) continue;
+              const mm = lineTrim.match(/^"?([A-Za-z0-9_\-.]+)"?\s*=\s*(.+)$/);
+              if (!mm) continue;
+              const subKey = mm[1];
+              let subValRaw = mm[2].trim();
+              subValRaw = subValRaw.replace(/,+\s*$/, '');
+              const q = subValRaw.match(/^"([\s\S]*?)"$/);
+              if (q) {
+                obj[subKey] = q[1];
+                continue;
+              }
+              if (/^(true|false)$/i.test(subValRaw)) {
+                obj[subKey] = /^true$/i.test(subValRaw);
+                continue;
+              }
+              if (/^-?\d+(?:\.\d+)?$/.test(subValRaw)) {
+                obj[subKey] = Number(subValRaw);
+                continue;
+              }
+              const listMatch2 = subValRaw.match(/^(?:tolist\()?\s*(\[.*\])\s*\)?$/);
+              if (listMatch2) {
+                try {
+                  const arr = JSON.parse(listMatch2[1]);
+                  obj[subKey] = arr;
+                  continue;
+                } catch {}
+              }
+              obj[subKey] = subValRaw;
+            }
+            try { out[key] = JSON.stringify(obj); } catch { out[key] = String(obj); }
+            for (const sk in obj) {
+              const flatKey = `${key}_${toVarKey(sk)}`;
+              const v = obj[sk];
+              out[flatKey] = Array.isArray(v) || (v && typeof v === 'object') ? JSON.stringify(v) : String(v);
+            }
+            continue;
+          }
+          // Strip quotes
+          const quoted = valRaw.match(/^"([\s\S]*?)"$/);
+          if (quoted) {
+            out[key] = quoted[1];
+            continue;
+          }
+          // tolist([...]) or list [...]
+          const listMatch = valRaw.match(/tolist\((\[.*\])\)/) || valRaw.match(/^(\[.*\])$/);
+          if (listMatch) {
+            try {
+              const arr = JSON.parse(listMatch[1]);
+              out[key] = Array.isArray(arr) ? arr.join(',') : String(arr);
+              continue;
+            } catch { /* ignore */ }
+          }
+          // Fallback
+          out[key] = valRaw;
+        }
+        return out;
+      }
+
+      function init() {
+        const stored = loadVars();
+        const detected = detectPlaceholders();
+        renderVarInputs(stored, detected);
+        // Apply on load
+        applyVars(stored);
+        // Attempt client-side README load if SSR failed
+        ensureReadmeLoaded();
+        // Initialize collapsible state
+        try {
+          const collapsed = JSON.parse(localStorage.getItem(collapsedKey) || 'false');
+          if (collapsed && varsContent && varsToggle) {
+            varsContent.classList.add('hidden');
+            varsToggle.setAttribute('aria-expanded', 'false');
+            varsToggle.textContent = 'Show';
+          }
+        } catch {}
+        varsToggle?.addEventListener('click', () => {
+          if (!varsContent || !varsToggle) return;
+          const isHidden = varsContent.classList.toggle('hidden');
+          varsToggle.setAttribute('aria-expanded', (!isHidden).toString());
+          varsToggle.textContent = isHidden ? 'Show' : 'Hide';
+          localStorage.setItem(collapsedKey, JSON.stringify(isHidden));
+        });
+      }
+
+      async function ensureReadmeLoaded() {
+        if (!readme) return;
+        const content = (readme.innerHTML || '').trim();
+        const text = (readme.textContent || '').trim();
+        const looksEmpty = content.length === 0;
+        const hasFallback = /Unable to load README|README content will appear here/.test(text);
+        if (!(looksEmpty || hasFallback)) return;
+        return;
+      }
+
+      btnParse?.addEventListener('click', () => {
+        const parsed = parseTerraformOutputs(tfTextarea?.value || '');
+        if (Object.keys(parsed).length === 0) return;
+        const current = loadVars();
+        const merged = { ...current, ...parsed };
+        saveVars(merged);
+        const detected = detectPlaceholders();
+        renderVarInputs(merged, detected);
+        applyVars(merged);
+      });
+
+      btnApply?.addEventListener('click', () => {
+        // Merge current inputs with any parsable textarea content for convenience
+        const current = collectVarsFromInputs();
+        const parsed = parseTerraformOutputs(tfTextarea?.value || '');
+        const merged = { ...current, ...parsed };
+        saveVars(merged);
+        applyVars(merged);
+        renderVarInputs(merged, detectPlaceholders());
+      });
+
+      btnClear?.addEventListener('click', () => {
+        saveVars({});
+        tfTextarea && (tfTextarea.value = '');
+        renderVarInputs({}, detectPlaceholders());
+        // Restore original code content if backed up
+        if (readme) {
+          readme.querySelectorAll('code').forEach((el) => {
+            if ((el as any)._orig) {
+              el.textContent = (el as any)._orig;
+            }
+          });
+        }
+      });
+
+      init();
+
+      // Copy button functionality
+      document.querySelectorAll('.copy-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          const textToCopy = button.getAttribute('data-copy');
+          if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+              const original = button.textContent;
+              button.textContent = 'Copied!';
+              setTimeout(() => {
+                button.textContent = original;
+              }, 2000);
+            });
+          }
+        });
+      });
+
+      // Ensure heading anchors work for direct links (GitHub HTML sometimes lacks id on the heading tag)
+      try {
+        document.querySelectorAll('.markdown-body .markdown-heading').forEach((wrapper) => {
+          const anchor = wrapper.querySelector('a.anchor[href^="#"]');
+          const heading = wrapper.querySelector('h1, h2, h3, h4, h5, h6');
+          if (anchor && heading) {
+            const href = anchor.getAttribute('href');
+            if (href && href.startsWith('#')) {
+              const id = href.slice(1);
+              if (!heading.id) heading.id = id;
+            }
+          }
+        });
+      } catch (e) {
+        // no-op
+      }
+    });
+  </script>
+</BaseLayout>

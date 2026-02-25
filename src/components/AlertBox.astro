@@ -1,0 +1,27 @@
+---
+export interface Props {
+  variant?: 'info' | 'warning' | 'success';
+  title?: string;
+  class?: string;
+}
+
+const { variant = 'warning', title, class: className = '' } = Astro.props as Props;
+
+const stylesByVariant: Record<string, string> = {
+  info: 'border-theme-primary/60 ring-theme-primary/30 text-theme-primary',
+  success: 'border-theme-primary/60 ring-theme-primary/30 text-theme-primary',
+  warning: 'border-theme-accent/80 ring-theme-accent/30 text-theme-accent',
+};
+
+const tone = stylesByVariant[variant] ?? stylesByVariant.warning;
+---
+
+<div class={`terminal-window ${tone} bg-black/80 ring-1 relative overflow-hidden ${className}`}>
+  <div class="flex items-center gap-2 mb-2 border-b border-current/30 pb-2">
+    <span aria-hidden="true">⚠️</span>
+    <span class="uppercase tracking-wider text-xs opacity-80">{title ?? 'Announcement'}</span>
+  </div>
+  <div class="text-sm text-theme-primary">
+    <slot />
+  </div>
+</div>

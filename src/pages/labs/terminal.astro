@@ -1,0 +1,527 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// This page expects:
+//   ?labId=<lab-id>        — lab to start (required)
+//   ?session=<session-id>  — existing session to reconnect (optional)
+
+const url = new URL(Astro.request.url);
+const labId = url.searchParams.get('labId');
+const existingSessionId = url.searchParams.get('session');
+
+if (!labId && !existingSessionId) {
+  return Astro.redirect('/labs');
+}
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/auth/login?redirect=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
+}
+---
+
+<BaseLayout title="Lab Terminal" description="Interactive lab environment">
+  <div id="lab-terminal-root">
+    <!-- Status bar -->
+    <div id="lab-status-bar">
+      <span id="lab-title">{labId ?? 'Lab'}</span>
+      <span id="lab-status" data-state="idle">idle</span>
+      <span id="lab-timer" style="display:none"></span>
+    </div>
+
+    <!-- Terminal container — xterm.js mounts here -->
+    <div id="terminal-container"></div>
+
+    <!-- Controls shown before/after session -->
+    <div id="lab-controls">
+      <button id="btn-start" class="lab-btn lab-btn-primary">Start Lab</button>
+      <div id="lab-message" style="display:none"></div>
+    </div>
+
+    <!-- Error overlay — shown for session expired, container failure, rate limit, maintenance -->
+    <div id="lab-overlay" style="display:none" aria-live="assertive">
+      <div id="lab-overlay-box">
+        <div id="lab-overlay-icon"></div>
+        <div id="lab-overlay-title"></div>
+        <div id="lab-overlay-body"></div>
+        <div id="lab-overlay-actions"></div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  #lab-terminal-root {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px); /* 60px for nav */
+    background: #0a0a0a;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+  }
+
+  #lab-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--color-bg-elevated, #111);
+    border-bottom: 1px solid var(--color-border, #222);
+    font-size: 0.8rem;
+    color: var(--color-primary, #0ff);
+  }
+
+  #lab-title {
+    font-weight: 600;
+  }
+
+  #lab-status {
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    background: #222;
+    color: #666;
+  }
+
+  #lab-status[data-state="connecting"] { color: #facc15; }
+  #lab-status[data-state="connected"]  { color: #4ade80; }
+  #lab-status[data-state="expired"]    { color: var(--color-error, #f87171); }
+  #lab-status[data-state="completed"]  { color: #4ade80; }
+
+  #lab-timer {
+    margin-left: auto;
+    color: #888;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #lab-timer.urgent { color: var(--color-error, #f87171); }
+
+  #terminal-container {
+    flex: 1;
+    overflow: hidden;
+    display: none; /* shown once session is active */
+  }
+
+  #lab-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem;
+    flex: 1;
+  }
+
+  #lab-controls.hidden { display: none; }
+
+  .lab-btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: opacity 0.15s;
+  }
+
+  .lab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .lab-btn-primary {
+    background: var(--color-primary, #0ff);
+    color: #000;
+    border-color: var(--color-primary, #0ff);
+  }
+
+  .lab-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+
+  #lab-message {
+    font-size: 0.85rem;
+    color: #888;
+    text-align: center;
+    max-width: 400px;
+  }
+
+  /* ─── Error overlay ─────────────────────────────────────────────────────── */
+
+  #lab-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 10, 10, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  #lab-overlay-box {
+    background: var(--color-bg-elevated, #111);
+    border: 1px solid var(--color-border, #222);
+    border-radius: 6px;
+    padding: 2rem 2.5rem;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #lab-overlay-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  #lab-overlay-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 0.5rem;
+  }
+
+  #lab-overlay-body {
+    font-size: 0.85rem;
+    color: #888;
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+  }
+
+  #lab-overlay-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+</style>
+
+<!-- xterm.js CSS (loaded dynamically in script) -->
+<script>
+  // @ts-nocheck
+  import { Terminal } from '@xterm/xterm';
+  import { AttachAddon } from '@xterm/addon-attach';
+  import { FitAddon } from '@xterm/addon-fit';
+  import '@xterm/xterm/css/xterm.css';
+
+  const LAB_API = import.meta.env.PUBLIC_LAB_WORKER_URL ?? 'https://labs.shart.cloud';
+
+  // ─── State ────────────────────────────────────────────────────────────────
+
+  const urlParams = new URLSearchParams(location.search);
+  const labId = urlParams.get('labId');
+  let sessionId = urlParams.get('session');
+  let expiresAt = 0;
+  let timerInterval = null;
+  let terminal = null;
+  let fitAddon = null;
+  let ws = null;
+
+  // ─── DOM refs ─────────────────────────────────────────────────────────────
+
+  const $statusBar    = document.getElementById('lab-status-bar');
+  const $status       = document.getElementById('lab-status');
+  const $timer        = document.getElementById('lab-timer');
+  const $termCtr      = document.getElementById('terminal-container');
+  const $controls     = document.getElementById('lab-controls');
+  const $btnStart     = document.getElementById('btn-start');
+  const $msg          = document.getElementById('lab-message');
+  const $overlay      = document.getElementById('lab-overlay');
+  const $overlayIcon  = document.getElementById('lab-overlay-icon');
+  const $overlayTitle = document.getElementById('lab-overlay-title');
+  const $overlayBody  = document.getElementById('lab-overlay-body');
+  const $overlayActs  = document.getElementById('lab-overlay-actions');
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  function setStatus(state, label) {
+    $status.dataset.state = state;
+    $status.textContent = label;
+  }
+
+  function showMessage(text) {
+    $msg.textContent = text;
+    $msg.style.display = 'block';
+  }
+
+  /**
+   * Show the full-screen overlay.
+   * @param {Object} opts
+   * @param {string} opts.icon     — emoji or symbol
+   * @param {string} opts.title
+   * @param {string} opts.body     — may contain HTML
+   * @param {Array<{label:string,primary?:boolean,onClick:function}>} opts.actions
+   */
+  function showOverlay({ icon, title, body, actions = [] }) {
+    $overlayIcon.textContent  = icon;
+    $overlayTitle.textContent = title;
+    $overlayBody.innerHTML    = body;
+    $overlayActs.innerHTML    = '';
+
+    for (const action of actions) {
+      const btn = document.createElement('button');
+      btn.textContent = action.label;
+      btn.className = action.primary
+        ? 'lab-btn lab-btn-primary'
+        : 'lab-btn';
+      btn.style.border = action.primary ? '' : '1px solid #444';
+      btn.style.background = action.primary ? '' : 'transparent';
+      btn.style.color = action.primary ? '' : '#aaa';
+      btn.addEventListener('click', action.onClick);
+      $overlayActs.appendChild(btn);
+    }
+
+    $overlay.style.display = 'flex';
+  }
+
+  function hideOverlay() {
+    $overlay.style.display = 'none';
+  }
+
+  function startTimer() {
+    $timer.style.display = 'inline';
+    timerInterval = setInterval(() => {
+      const remaining = Math.max(0, expiresAt - Math.floor(Date.now() / 1000));
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      $timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} remaining`;
+      $timer.classList.toggle('urgent', remaining < 300);
+      if (remaining === 0) {
+        clearInterval(timerInterval);
+        handleSessionExpired();
+      }
+    }, 1000);
+  }
+
+  function handleSessionExpired() {
+    setStatus('expired', 'session expired');
+    ws?.close();
+    showOverlay({
+      icon: '⏱',
+      title: 'Session Expired',
+      body: 'Your lab session has timed out. Your progress was not saved.',
+      actions: [
+        {
+          label: 'Start New Attempt',
+          primary: true,
+          onClick: () => {
+            history.replaceState(null, '', `?labId=${labId}`);
+            location.reload();
+          },
+        },
+        {
+          label: 'Back to Labs',
+          onClick: () => { location.href = '/labs'; },
+        },
+      ],
+    });
+  }
+
+  // ─── xterm.js setup ───────────────────────────────────────────────────────
+
+  function initTerminal(wsUrl) {
+    $controls.classList.add('hidden');
+    $termCtr.style.display = 'block';
+
+    terminal = new Terminal({
+      cursorBlink: true,
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: 14,
+      theme: {
+        background: '#0a0a0a',
+        foreground: '#e2e8f0',
+        cursor: '#0ff',
+        selectionBackground: 'rgba(0,255,255,0.2)',
+        black:   '#1a1a2e',
+        red:     '#f87171',
+        green:   '#4ade80',
+        yellow:  '#facc15',
+        blue:    '#60a5fa',
+        magenta: '#c084fc',
+        cyan:    '#22d3ee',
+        white:   '#e2e8f0',
+      },
+      scrollback: 5000,
+      allowProposedApi: true,
+    });
+
+    fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+
+    terminal.open($termCtr);
+    fitAddon.fit();
+
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    // Track whether the connection was established so we can detect early failures.
+    let wsOpened = false;
+    const wsOpenedAt = Date.now();
+
+    ws.addEventListener('open', () => {
+      wsOpened = true;
+      setStatus('connected', 'connected');
+      const attachAddon = new AttachAddon(ws);
+      terminal.loadAddon(attachAddon);
+      fitAddon.fit();
+    });
+
+    ws.addEventListener('close', () => {
+      const sessionState = $status.dataset.state;
+      if (sessionState === 'expired' || sessionState === 'completed') return;
+
+      // If the socket closed within 5 s without ever opening, the container
+      // likely failed to start.
+      const elapsed = Date.now() - wsOpenedAt;
+      if (!wsOpened && elapsed < 5000) {
+        setStatus('idle', 'failed');
+        showOverlay({
+          icon: '⚠',
+          title: 'Container Failed to Start',
+          body: 'The lab container could not be provisioned. This is usually temporary.',
+          actions: [
+            {
+              label: 'Retry',
+              primary: true,
+              onClick: () => {
+                hideOverlay();
+                history.replaceState(null, '', `?labId=${labId}`);
+                location.reload();
+              },
+            },
+            {
+              label: 'Back to Labs',
+              onClick: () => { location.href = '/labs'; },
+            },
+          ],
+        });
+        return;
+      }
+
+      setStatus('idle', 'disconnected');
+      if (terminal) {
+        terminal.writeln('\r\n\x1b[33mConnection closed.\x1b[0m');
+      }
+    });
+
+    ws.addEventListener('error', () => {
+      if (!wsOpened) return; // close event will handle the overlay
+      setStatus('idle', 'error');
+      if (terminal) {
+        terminal.writeln('\r\n\x1b[31mWebSocket error. Check your connection.\x1b[0m');
+      }
+    });
+
+    window.addEventListener('resize', () => fitAddon?.fit());
+  }
+
+  // ─── Session creation ─────────────────────────────────────────────────────
+
+  async function startSession() {
+    $btnStart.disabled = true;
+    setStatus('connecting', 'starting...');
+    showMessage('Provisioning your container...');
+
+    try {
+      const res = await fetch(`${LAB_API}/api/labs/sessions`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lab_id: labId }),
+      });
+
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        const resetsAt = data.resets_at
+          ? new Date(data.resets_at * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : 'midnight UTC';
+        setStatus('idle', 'rate limited');
+        showOverlay({
+          icon: '🚫',
+          title: 'Daily Limit Reached',
+          body: `You've used all your lab attempts for today.<br>Limit resets at <strong>${resetsAt}</strong>.`,
+          actions: [
+            {
+              label: 'Back to Labs',
+              primary: true,
+              onClick: () => { location.href = '/labs'; },
+            },
+          ],
+        });
+        return;
+      }
+
+      if (res.status === 503) {
+        setStatus('idle', 'maintenance');
+        showOverlay({
+          icon: '🔧',
+          title: 'Labs Temporarily Unavailable',
+          body: 'The lab environment is currently undergoing maintenance. Please try again later.',
+          actions: [
+            {
+              label: 'Back to Labs',
+              primary: true,
+              onClick: () => { location.href = '/labs'; },
+            },
+          ],
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      sessionId = data.session_id;
+      expiresAt = data.expires_at;
+
+      // Update URL so a reload reconnects to the same session
+      history.replaceState(null, '', `?labId=${labId}&session=${sessionId}`);
+
+      startTimer();
+      initTerminal(data.ws_url);
+    } catch (err) {
+      setStatus('idle', 'error');
+      $btnStart.disabled = false;
+      showMessage(`Failed to start session: ${err.message}`);
+    }
+  }
+
+  // ─── Reconnect to existing session ────────────────────────────────────────
+
+  async function reconnectSession() {
+    const parts = sessionId.split(':');
+    if (parts.length !== 3) { location.replace('/labs'); return; }
+    const [userId, labIdFromSession] = parts;
+
+    setStatus('connecting', 'reconnecting...');
+    showMessage('Reconnecting to your session...');
+    $btnStart.style.display = 'none';
+
+    try {
+      const res = await fetch(`${LAB_API}/api/labs/sessions/${userId}/${labIdFromSession}`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      if (!data.session || data.session.session_id !== sessionId) {
+        throw new Error('Session no longer active');
+      }
+
+      expiresAt = data.session.expires_at;
+      startTimer();
+      initTerminal(data.session.ws_url);
+    } catch (err) {
+      setStatus('idle', 'idle');
+      $btnStart.style.display = '';
+      $btnStart.disabled = false;
+      showMessage(`Could not reconnect: ${err.message}. Start a new session.`);
+    }
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+
+  $btnStart.addEventListener('click', startSession);
+
+  if (sessionId) {
+    reconnectSession();
+  }
+</script>

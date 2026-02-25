@@ -1,0 +1,51 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getAllEventsSorted, eventHref, formatEventDateRange } from '../../lib/events';
+
+const { upcoming, past } = await getAllEventsSorted();
+---
+
+<BaseLayout title="Events">
+  <h1 class="text-2xl font-bold text-theme-primary uppercase">Events</h1>
+  <p class="text-theme-muted mt-2 mb-6">Talks, streams, and appearances. Catch us live or browse the archive.</p>
+
+  {upcoming.length > 0 && (
+    <section class="terminal-window mb-8">
+      <h2 class="text-xl font-bold mb-3">Events where you can find the 💩.cloud team: </h2>
+      <ul class="space-y-2">
+        {upcoming.map((e) => {
+          const href = eventHref(e);
+          const isExternal = Boolean(e.data.url);
+          const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
+          return (
+            <li class="flex items-center justify-between gap-4">
+              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-theme-bright">{e.data.title}{isExternal ? ' ↗' : ''}</a>
+              <span class="text-xs text-theme-subtle">{dateStr}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  )}
+
+  <section class="terminal-window">
+    <h2 class="text-xl font-bold mb-3">Past</h2>
+    {past.length === 0 ? (
+      <p class="text-sm opacity-80">No past events yet.</p>
+    ) : (
+      <ul class="space-y-2">
+        {past.map((e) => {
+          const href = eventHref(e);
+          const isExternal = Boolean(e.data.url);
+          const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
+          return (
+            <li class="flex items-center justify-between gap-4">
+              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-theme-bright">{e.data.title}{isExternal ? ' ↗' : ''}</a>
+              <span class="text-xs text-theme-subtle">{dateStr}</span>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </section>
+</BaseLayout>

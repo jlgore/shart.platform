@@ -1,0 +1,406 @@
+---
+export const prerender = false;
+
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { GitHubREADMEFetcher } from '../../../lib/github/readme-fetcher.js';
+import { discoverCourseDocs, inferCourseDocFromPath, type CourseDoc } from '../../../lib/github/course-discovery.js';
+import { sanitizeHtml } from '../../../lib/sanitize-html.js';
+import { getSessionToken } from '../../../lib/auth-helpers';
+import { getCourseProgress } from '../../../lib/api-client';
+import CourseMarkComplete from '../../../components/courses/CourseMarkComplete.tsx';
+import CourseDocEnhancer from '../../../components/courses/CourseDocEnhancer.tsx';
+
+const user = Astro.locals.user;
+const courseSlug = Astro.params.courseSlug;
+const docPathParam = Astro.params.docPath ?? '';
+
+const allCourses = await getCollection('courses', ({ data }) => data.draft !== true && data.isActive !== false);
+const course = allCourses.find((entry) => entry.slug === courseSlug);
+
+if (!course) {
+  return new Response(null, { status: 404 });
+}
+
+const normalizedDocPath = typeof docPathParam === 'string' ? docPathParam : '';
+const doc: CourseDoc = inferCourseDocFromPath(normalizedDocPath) ?? {
+  path: normalizedDocPath,
+  kind: 'lab' as const,
+  weekNumber: 0,
+  title: normalizedDocPath,
+};
+
+const token = (import.meta as any).env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+
+// Discover all docs for prev/next navigation (in-memory cached by fetcher)
+let allDocs: CourseDoc[] = [];
+try {
+  allDocs = await discoverCourseDocs({
+    repo: course.data.githubRepo,
+    ref: course.data.defaultRef,
+    weekPattern: course.data.weekPattern,
+    labPattern: course.data.labPattern,
+    token,
+  });
+} catch {
+  // no-op: prev/next will be unavailable
+}
+
+const weekNumbers = [...new Set(allDocs.map((d) => d.weekNumber))].sort((a, b) => a - b);
+const currentIndex = allDocs.findIndex((d) => d.path === normalizedDocPath);
+const prevDoc = currentIndex > 0 ? allDocs[currentIndex - 1] : null;
+const nextDoc = currentIndex >= 0 && currentIndex < allDocs.length - 1 ? allDocs[currentIndex + 1] : null;
+
+// Fetch and sanitize markdown content
+const fetcher = new GitHubREADMEFetcher({ token });
+let renderedHtml = '';
+try {
+  const rawHtml = await fetcher.fetchMarkdownFileHtml(course.data.githubRepo, normalizedDocPath, course.data.defaultRef);
+  renderedHtml = await sanitizeHtml(rawHtml);
+} catch {
+  renderedHtml = await sanitizeHtml('<p><em>Unable to load this markdown document from GitHub right now.</em></p>');
+}
+
+// Prefetch completion status for logged-in users
+const apiBase = Astro.locals.runtime?.env?.API_BASE_URL
+  || (import.meta.env.PROD ? 'https://platform.shart.cloud' : 'http://localhost:8787');
+
+let isCompleted = false;
+if (user) {
+  const sessionToken = getSessionToken(Astro);
+  if (sessionToken) {
+    try {
+      const progress = await getCourseProgress(courseSlug, sessionToken, apiBase);
+      isCompleted = progress.completed_docs.includes(normalizedDocPath);
+    } catch {
+      // ignore - defaults to false
+    }
+  }
+}
+
+const prettyPath = normalizedDocPath.replace(/\/README\.md$/i, '');
+const pageTitle = `${course.data.title} - ${doc.title}`;
+const sourceUrl = `https://github.com/${course.data.githubRepo}/blob/${course.data.defaultRef}/${normalizedDocPath}`;
+---
+
+<BaseLayout title={pageTitle} description={`${course.data.title}: ${doc.title}`}>
+  <div class="course-doc">
+    <nav class="course-doc__breadcrumb">
+      <a href="/courses">Courses</a>
+      <span>→</span>
+      <a href={`/courses/${course.slug}`}>{course.data.title}</a>
+      <span>→</span>
+      <span>{prettyPath}</span>
+    </nav>
+
+    <header class="course-doc__header">
+      <p class="course-doc__kicker">[{doc.kind.toUpperCase()}]</p>
+      <h1>{doc.title}</h1>
+      <p class="course-doc__path">{prettyPath}</p>
+      <div class="course-doc__actions">
+        <a href={`/courses/${course.slug}`}>Back to course map</a>
+        <a href={sourceUrl} target="_blank" rel="noopener noreferrer">Open on GitHub ↗</a>
+      </div>
+      <div class="course-doc__progress">
+        <CourseMarkComplete
+          courseSlug={courseSlug}
+          docPath={normalizedDocPath}
+          initialCompleted={isCompleted}
+          isLoggedIn={!!user}
+          apiBase={apiBase}
+          client:load
+        />
+      </div>
+    </header>
+
+    {allDocs.length > 0 && (
+      <details class="course-toc">
+        <summary class="course-toc__summary">
+          Course Contents
+          <span class="course-toc__meta">{weekNumbers.length} weeks · {allDocs.filter((d) => d.kind === 'lab').length} labs</span>
+        </summary>
+        <nav class="course-toc__nav">
+          {weekNumbers.map((weekNum) => {
+            const weekDoc = allDocs.find((d) => d.weekNumber === weekNum && d.kind === 'week');
+            const labs = allDocs.filter((d) => d.weekNumber === weekNum && d.kind === 'lab');
+            return (
+              <div class="course-toc__week">
+                {weekDoc ? (
+                  <a
+                    href={`/courses/${course.slug}/${weekDoc.path}`}
+                    class={`course-toc__week-link${weekDoc.path === normalizedDocPath ? ' course-toc__week-link--active' : ''}`}
+                  >
+                    Week {weekNum}
+                  </a>
+                ) : (
+                  <span class="course-toc__week-label">Week {weekNum}</span>
+                )}
+                {labs.length > 0 && (
+                  <ul class="course-toc__labs">
+                    {labs.map((lab) => (
+                      <li>
+                        <a
+                          href={`/courses/${course.slug}/${lab.path}`}
+                          class={`course-toc__lab-link${lab.path === normalizedDocPath ? ' course-toc__lab-link--active' : ''}`}
+                        >
+                          {lab.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+      </details>
+    )}
+
+    <article class="course-doc__content prose prose-invert max-w-none" set:html={renderedHtml}></article>
+
+    <CourseDocEnhancer courseSlug={courseSlug} docPath={normalizedDocPath} client:load />
+
+    {(prevDoc || nextDoc) && (
+      <nav class="course-doc__nav">
+        <div class="course-doc__nav-prev">
+          {prevDoc && (
+            <a href={`/courses/${course.slug}/${prevDoc.path}`} class="course-doc__nav-link">
+              <span class="course-doc__nav-dir">← Prev</span>
+              <span class="course-doc__nav-title">{prevDoc.title}</span>
+            </a>
+          )}
+        </div>
+        <div class="course-doc__nav-next">
+          {nextDoc && (
+            <a href={`/courses/${course.slug}/${nextDoc.path}`} class="course-doc__nav-link course-doc__nav-link--next">
+              <span class="course-doc__nav-dir">Next →</span>
+              <span class="course-doc__nav-title">{nextDoc.title}</span>
+            </a>
+          )}
+        </div>
+      </nav>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .course-doc {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .course-doc__breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    color: var(--color-primary-muted);
+    font-size: 0.8rem;
+  }
+
+  .course-doc__breadcrumb a {
+    color: var(--color-primary-muted);
+    text-decoration: none;
+  }
+
+  .course-doc__breadcrumb a:hover {
+    color: var(--color-primary);
+  }
+
+  .course-doc__header {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    padding: 1rem;
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .course-doc__kicker {
+    margin: 0;
+    color: var(--color-accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .course-doc__header h1,
+  .course-doc__header p {
+    margin: 0;
+  }
+
+  .course-doc__path {
+    color: var(--color-primary-subtle);
+    font-size: 0.85rem;
+  }
+
+  .course-doc__actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .course-doc__actions a {
+    color: var(--color-primary);
+    font-size: 0.85rem;
+  }
+
+  .course-doc__progress {
+    padding-top: 0.25rem;
+  }
+
+  .course-toc {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .course-toc__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-primary);
+    user-select: none;
+    list-style: none;
+  }
+
+  .course-toc__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .course-toc__summary::before {
+    content: '▶';
+    font-size: 0.6rem;
+    color: var(--color-primary-muted);
+    transition: transform 0.15s;
+  }
+
+  details[open] .course-toc__summary::before {
+    transform: rotate(90deg);
+  }
+
+  .course-toc__meta {
+    color: var(--color-primary-muted);
+    font-size: 0.75rem;
+  }
+
+  .course-toc__nav {
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.5rem 1rem 0.75rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .course-toc__week {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .course-toc__week-link,
+  .course-toc__week-label {
+    display: block;
+    font-size: 0.85rem;
+    padding: 0.25rem 0;
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .course-toc__week-link:hover {
+    color: var(--color-primary-bright, var(--color-primary));
+    text-decoration: underline;
+  }
+
+  .course-toc__week-link--active {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .course-toc__week-label {
+    color: var(--color-primary-muted);
+  }
+
+  .course-toc__labs {
+    list-style: none;
+    padding: 0 0 0.35rem 1rem;
+    margin: 0;
+    display: grid;
+    gap: 0.1rem;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .course-toc__lab-link {
+    display: block;
+    font-size: 0.8rem;
+    padding: 0.2rem 0;
+    color: var(--color-primary-subtle);
+    text-decoration: none;
+  }
+
+  .course-toc__lab-link:hover {
+    color: var(--color-primary);
+  }
+
+  .course-toc__lab-link--active {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .course-doc__content {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    padding: 1rem;
+  }
+
+  .course-doc__nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.75rem;
+  }
+
+  .course-doc__nav-prev {
+    justify-self: start;
+  }
+
+  .course-doc__nav-next {
+    justify-self: end;
+  }
+
+  .course-doc__nav-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    text-decoration: none;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-elevated);
+    transition: border-color 0.15s;
+    max-width: 18rem;
+  }
+
+  .course-doc__nav-link:hover {
+    border-color: var(--color-primary-muted);
+  }
+
+  .course-doc__nav-link--next {
+    text-align: right;
+  }
+
+  .course-doc__nav-dir {
+    font-size: 0.72rem;
+    color: var(--color-primary-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .course-doc__nav-title {
+    font-size: 0.85rem;
+    color: var(--color-primary);
+  }
+</style>

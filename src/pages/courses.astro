@@ -1,0 +1,173 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { discoverCourseDocs } from '../lib/github/course-discovery.js';
+
+const courses = await getCollection('courses', ({ data }) => data.draft !== true && data.isActive !== false);
+const sortedCourses = courses.sort((a, b) => a.data.title.localeCompare(b.data.title));
+
+const token = (import.meta as any).env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+const courseStartPaths = await Promise.all(
+  sortedCourses.map(async (course) => {
+    try {
+      const docs = await discoverCourseDocs({
+        repo: course.data.githubRepo,
+        ref: course.data.defaultRef,
+        weekPattern: course.data.weekPattern,
+        labPattern: course.data.labPattern,
+        token,
+      });
+      const firstWeekDoc = docs.find((d) => d.kind === 'week');
+      return firstWeekDoc ? `/courses/${course.slug}/${firstWeekDoc.path}` : `/courses/${course.slug}`;
+    } catch {
+      return `/courses/${course.slug}`;
+    }
+  })
+);
+---
+
+<BaseLayout
+  title="Courses"
+  description="Long-form cloud security and container courses powered by GitHub markdown."
+>
+  <div class="courses-page">
+    <header class="courses-header">
+      <p class="courses-kicker">[COURSE_INDEX]</p>
+      <h1>Courses</h1>
+      <p>Structured tracks with week-by-week curriculum and labs pulled directly from source repositories.</p>
+    </header>
+
+    <section class="courses-grid">
+      {sortedCourses.map((course, i) => (
+        <article class="course-card">
+          <div class="course-card__meta">
+            <span class="course-card__difficulty" data-level={course.data.difficulty}>{course.data.difficulty}</span>
+            <span class="course-card__repo">{course.data.githubRepo}</span>
+          </div>
+          <h2>
+            <a href={courseStartPaths[i]}>{course.data.title}</a>
+          </h2>
+          <p>{course.data.description}</p>
+          <div class="course-card__tags">
+            {course.data.tags.map((tag) => <span>#{tag}</span>)}
+          </div>
+          <div class="course-card__actions">
+            <a href={courseStartPaths[i]}>Start course</a>
+            <a href={`/courses/${course.slug}`}>Browse docs</a>
+            <a href={`https://github.com/${course.data.githubRepo}`} target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+          </div>
+        </article>
+      ))}
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .courses-page {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .courses-header {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    padding: 1.5rem;
+    border-radius: 6px;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .courses-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+  }
+
+  .courses-header p {
+    margin: 0;
+    color: var(--color-primary-subtle);
+  }
+
+  .courses-kicker {
+    margin: 0;
+    color: var(--color-accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .courses-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .course-card {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    padding: 1.25rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .course-card h2 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .course-card h2 a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .course-card h2 a:hover {
+    color: var(--color-primary-bright);
+  }
+
+  .course-card p {
+    margin: 0;
+    color: var(--color-primary-subtle);
+  }
+
+  .course-card__meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary-muted);
+  }
+
+  .course-card__difficulty {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .course-card__difficulty[data-level='advanced'] {
+    color: var(--color-error);
+  }
+
+  .course-card__difficulty[data-level='beginner'] {
+    color: var(--color-primary);
+  }
+
+  .course-card__tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    color: var(--color-primary-muted);
+    font-size: 0.75rem;
+  }
+
+  .course-card__actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .course-card__actions a {
+    color: var(--color-primary);
+    font-size: 0.85rem;
+  }
+</style>

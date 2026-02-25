@@ -1,0 +1,53 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { eventHref, formatEventDateRange } from '../../lib/events';
+
+export async function getStaticPaths() {
+  const events = await getCollection('events', ({ data }) => data.draft !== true);
+  return events.map((e) => ({ params: { slug: e.slug }, props: e }));
+}
+
+type Props = CollectionEntry<'events'>;
+const event = Astro.props as Props;
+const { Content } = await event.render();
+
+const dateStr = formatEventDateRange(event.data.startDate, event.data.endDate, {
+  includeTime: true,
+  timeZone: event.data.timeZone ?? 'UTC',
+  timeZoneLabel: event.data.timeZoneLabel,
+});
+const href = eventHref(event);
+const isExternal = Boolean(event.data.url);
+---
+
+<BaseLayout title={event.data.title} description={event.data.description}>
+  <article class="space-y-6">
+    <header class="border border-theme-primary/40 rounded-md p-4">
+      <div class="flex items-center justify-between gap-4">
+        <div class="text-sm text-theme-muted">
+          <p><strong>When:</strong> {dateStr}</p>
+          {event.data.location && <p><strong>Where:</strong> {event.data.location}</p>}
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          {event.data.tags?.map((t) => (
+            <span class="px-2 py-1 border border-theme-primary/50 rounded uppercase">#{t}</span>
+          ))}
+        </div>
+      </div>
+      {href && (
+        <div class="mt-3">
+          <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="px-3 py-1 border border-theme-primary/60 rounded hover:text-theme-bright inline-block">{isExternal ? 'Event / Registration ↗' : 'Event details'}</a>
+        </div>
+      )}
+    </header>
+
+    <section class="prose prose-invert max-w-none">
+      <Content />
+    </section>
+
+    <footer class="pt-4 text-sm">
+      <a href="/events" class="underline underline-offset-4 decoration-dotted hover:text-theme-bright">← Back to events</a>
+    </footer>
+  </article>
+</BaseLayout>

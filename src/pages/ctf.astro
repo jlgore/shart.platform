@@ -2,92 +2,371 @@
 import CTFLayout from '../layouts/CTFLayout.astro';
 import { getCollection } from 'astro:content';
 import CertificateSVG from '../components/ctf/CertificateSVG.astro';
+import DataCard from '../components/ui/DataCard.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+import StatusBadge from '../components/ui/StatusBadge.astro';
 
 const challenges = (await getCollection('ctf')).sort(
   (a, b) => a.data.launchDate.getTime() - b.data.launchDate.getTime()
 );
+
+const difficultyColors: Record<string, string> = {
+  beginner: 'difficulty-beginner',
+  intermediate: 'difficulty-intermediate',
+  advanced: 'difficulty-advanced',
+};
+
+const user = Astro.locals.user;
 ---
 
-<CTFLayout title="Capture The Flag" description="Challenge catalog, downloads, and scoreboard placeholders">
-  <section class="space-y-10">
-    <div class="terminal-window">
-      <div class="terminal-header">
-        <span class="text-xs text-term-green/80">CATALOG</span>
-        <span class="text-xs text-term-green/60">{challenges.length} entries</span>
+<CTFLayout title="Capture The Flag" description="Hands-on cloud security challenges">
+  <div class="ctf-page">
+    <!-- Player Hub -->
+    <DataCard as="section" class="player-hub" hover={false} style="--card-padding: 2rem 1.75rem">
+      <div class="hub-content">
+        <div class="hub-text">
+          <h2 class="hub-title">Player Hub</h2>
+          <p class="hub-description">
+            {user ? `Welcome back, ${user.name || user.email}` : 'Log in to track your progress and compete on the leaderboard'}
+          </p>
+        </div>
+        <div class="hub-actions">
+          {user ? (
+            <>
+              <a href="/ctf/play" class="hub-btn hub-btn-primary">Play Challenges</a>
+              <a href="/ctf/dashboard" class="hub-btn hub-btn-secondary">Dashboard</a>
+            </>
+          ) : (
+            <>
+              <a href="/auth/login?redirect=/ctf/play" class="hub-btn hub-btn-primary">Login to Play</a>
+              <a href="/auth/register" class="hub-btn hub-btn-secondary">Create Account</a>
+            </>
+          )}
+        </div>
       </div>
-      <ul class="space-y-8">
-        {challenges.map(({ slug, data }) => {
-          const launch = data.launchDate.toLocaleDateString(undefined, {
-            year: 'numeric', month: 'long', day: 'numeric'
-          });
-          const labelLower = (data.releaseLabel ?? '').toLowerCase().trim();
-          const isPre = data.isReleased && /alpha|beta|rc|preview/.test(labelLower);
-          const status = !data.isReleased
-            ? '⏳ Not Released'
-            : labelLower.includes('beta')
-              ? 'β beta'
-              : labelLower.includes('alpha')
-                ? 'α alpha'
-                : labelLower
-                  ? `✅ ${data.releaseLabel}`
-                  : '✅ Released';
-          const statusClasses = !data.isReleased
-            ? 'px-2 py-1 rounded uppercase select-none opacity-70 cursor-not-allowed pointer-events-none border border-dashed border-term-green/30'
-            : isPre
-              ? 'px-2 py-1 rounded uppercase border border-term-amber/60 text-term-amber'
-              : 'px-2 py-1 rounded uppercase border border-term-green/60 text-term-green';
-          return (
-            <li class="border border-term-green/40 rounded-md p-4">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <h2 class="text-lg font-bold">
-                    <a href={`/ctf/${slug}`} class="hover:text-term-green-dark">{data.title}</a>
-                  </h2>
-                  <p class="text-sm text-term-green/80"><strong>Launch:</strong> {launch}</p>
-                </div>
-                <div class="flex items-center gap-2 text-xs">
-                  <span class="px-2 py-1 border border-term-green/50 rounded uppercase">{data.category}</span>
-                  <span class="px-2 py-1 border border-term-green/50 rounded uppercase">{data.difficulty}</span>
-                  <span class={statusClasses} aria-disabled={!data.isReleased} title={status}>{status}</span>
-                </div>
-              </div>
-              <p class="mt-3">{data.description}</p>
+    </DataCard>
 
-              <div class="mt-4 flex flex-wrap items-center gap-4 text-sm">
+    <!-- Challenge Grid -->
+    <section class="challenges-section">
+      <SectionHeader title="Challenges">
+        <span slot="meta" class="section-count">{challenges.length} available</span>
+      </SectionHeader>
+
+      <div class="challenges-grid">
+        {challenges.map(({ slug, data }, index) => {
+          const isPre = data.isReleased && /alpha|beta|rc|preview/i.test(data.releaseLabel ?? '');
+          const statusText = !data.isReleased ? 'Coming Soon' : isPre ? data.releaseLabel : 'Available';
+          const statusTone = !data.isReleased ? 'muted' : isPre ? 'accent' : 'success';
+
+          return (
+            <DataCard as="article" class="challenge-card" style={`--delay: ${index * 60}ms; --card-padding: 1.5rem`}>
+              <div class="challenge-header">
+                <div class="challenge-badges">
+                  <span class="badge badge-category">{data.category}</span>
+                  <span class={`badge ${difficultyColors[data.difficulty]}`}>{data.difficulty}</span>
+                </div>
+                <StatusBadge tone={statusTone}>{statusText}</StatusBadge>
+              </div>
+
+              <h3 class="challenge-title">
+                <a href={`/ctf/${slug}`}>{data.title}</a>
+              </h3>
+
+              <p class="challenge-description">{data.description}</p>
+
+              <div class="challenge-footer">
+                <time class="challenge-date" datetime={data.launchDate.toISOString()}>
+                  {data.launchDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                </time>
+
                 {data.isReleased && (
-                  <a href={data.repoUrl} rel="noopener noreferrer" target="_blank" class="text-term-green/90 hover:text-term-green-dark">View Source ↗</a>
-                )}
-                {data.downloads.length > 0 && (
-                  <div class="flex items-center gap-3 flex-wrap">
-                    {data.downloads.map((d) => (
-                      <a href={d.url} target="_blank" rel="noopener noreferrer" class="px-2 py-1 border border-term-green/50 rounded hover:text-term-green-dark">
-                        {d.label}
-                      </a>
-                    ))}
+                  <div class="challenge-actions">
+                    <a href={`/ctf/${slug}`} class="action-link">Start Challenge →</a>
                   </div>
                 )}
-                <a href={`/ctf/${slug}`} class="underline underline-offset-4 decoration-dotted hover:text-term-green-dark">View Challenge →</a>
               </div>
-            </li>
+            </DataCard>
           );
         })}
-      </ul>
-    </div>
+      </div>
+    </section>
 
-    <div class="terminal-window">
-      <div class="terminal-header">
-        <span class="text-xs text-term-green/80">SCOREBOARD</span>
-        <span class="text-xs text-term-green/60">Bragging Rights for PWNING Shart</span>
-      </div>
-      <div class="flex flex-col sm:flex-row items-center gap-6">
-        <div class="border border-term-green/40 rounded">
-          <CertificateSVG name="0xYOU" width={384} height={240} awards={3} />
+    <!-- Scoreboard Teaser -->
+    <section class="scoreboard-section">
+      <SectionHeader title="Scoreboard">
+        <a slot="action" href="/ctf/dashboard" class="section-link">View Full Leaderboard →</a>
+      </SectionHeader>
+
+      <DataCard as="div" class="scoreboard-preview" hover={false} style="--card-padding: 2rem">
+        <div class="certificate-preview">
+          <CertificateSVG name="0xYOU" width={320} height={200} awards={3} />
         </div>
-        <div class="text-sm text-term-green/80">
-          <p>Scoreboard coming soon.</p>
-          <p class="mt-2 italic">brag to your friends about achievements~!</p>
+        <div class="scoreboard-info">
+          <p>Complete challenges to earn achievements and climb the leaderboard.</p>
+          <p class="scoreboard-cta">
+            {user ? (
+              <a href="/ctf/dashboard">View your progress →</a>
+            ) : (
+              <a href="/auth/login?redirect=/ctf/dashboard">Log in to track progress</a>
+            )}
+          </p>
         </div>
-      </div>
-    </div>
-  </section>
+      </DataCard>
+    </section>
+  </div>
 </CTFLayout>
+
+<style>
+  .ctf-page {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  /* Player Hub */
+  .player-hub {
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 52%),
+      linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg) 100%);
+    border: 1px solid var(--color-primary-subtle);
+  }
+
+  .hub-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .hub-content {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+
+  .hub-title {
+    margin: 0 0 0.25rem;
+    font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .hub-description {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  .hub-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .hub-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 0.25rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .hub-btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-bg);
+    border: 1px solid var(--color-primary);
+  }
+
+  .hub-btn-primary:hover {
+    background-color: var(--color-primary-bright);
+  }
+
+  .hub-btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-primary-muted);
+  }
+
+  .hub-btn-secondary:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  /* Section styling */
+  .section-link {
+    font-size: 0.75rem;
+    color: var(--color-primary-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .section-link:hover {
+    color: var(--color-primary);
+  }
+
+  .section-count {
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Challenge grid */
+  .challenges-grid {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .challenges-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  /* Challenge card */
+  .challenge-card {
+    display: flex;
+    flex-direction: column;
+    animation: card-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(1px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  .challenge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .challenge-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .badge {
+    padding: 0.125rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 0.25rem;
+    border: 1px solid var(--color-border);
+    color: var(--color-primary-muted);
+  }
+
+  .badge-category {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    opacity: 0.8;
+  }
+
+  .difficulty-beginner { color: #66cc66; border-color: #66cc66; }
+  .difficulty-intermediate { color: #ccaa44; border-color: #ccaa44; }
+  .difficulty-advanced { color: #cc6666; border-color: #cc6666; }
+
+  .challenge-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .challenge-title a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .challenge-title a:hover {
+    color: var(--color-primary-bright);
+  }
+
+  .challenge-description {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-primary-muted);
+    flex-grow: 1;
+  }
+
+  .challenge-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .challenge-date {
+    font-size: 0.75rem;
+    color: var(--color-primary-subtle);
+  }
+
+  .action-link {
+    font-size: 0.875rem;
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .action-link:hover {
+    color: var(--color-primary-bright);
+  }
+
+  /* Scoreboard section */
+  .scoreboard-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.75rem;
+    text-align: center;
+  }
+
+  @media (min-width: 640px) {
+    .scoreboard-preview {
+      flex-direction: row;
+      text-align: left;
+    }
+  }
+
+  .certificate-preview {
+    flex-shrink: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+
+  .scoreboard-info {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  .scoreboard-info p {
+    margin: 0 0 0.5rem;
+  }
+
+  .scoreboard-cta {
+    color: var(--color-primary-subtle);
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,55 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+export interface Props extends HTMLAttributes<'article'> {
+  as?: 'article' | 'section' | 'div' | 'header';
+  hover?: boolean;
+  noPad?: boolean;
+}
+
+const { as = 'article', class: className = '', hover = true, noPad = false } = Astro.props as Props;
+const Tag = as;
+---
+
+<Tag class:list={['ui-data-card', { 'ui-data-card-hover': hover, 'ui-data-card-no-pad': noPad }, className]}>
+  <slot />
+</Tag>
+
+<style>
+  .ui-data-card {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    padding: var(--card-padding, 1.5rem);
+  }
+
+  .ui-data-card-no-pad {
+    padding: 0;
+  }
+
+  .ui-data-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-primary) 35%, transparent),
+      transparent
+    );
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .ui-data-card-hover {
+    transition: border-color 0.2s ease, box-shadow 0.3s ease, transform 0.2s ease;
+  }
+
+  .ui-data-card-hover:hover {
+    border-color: var(--color-primary-subtle);
+    box-shadow: 0 0 30px -4px color-mix(in srgb, var(--color-primary) 25%, transparent);
+  }
+</style>

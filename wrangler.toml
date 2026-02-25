@@ -1,3 +1,20 @@
+# Default config for local development (wrangler pages dev)
+name = "shart-platform-local"
+compatibility_date = "2025-03-25"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+API_BASE_URL = "http://localhost:8787"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shart-ctf-db"
+database_id = "786fbd4c-fefe-49ba-b64f-0d345d8bac1b"
+
+# ============================================================================
+# Production
+# ============================================================================
+[env.prod]
 name = "shart-platform-prod"
 main = "./dist/_worker.js/index.js"
 compatibility_date = "2025-03-25"
@@ -14,3 +31,20 @@ directory = "./dist"
 
 [observability]
 enabled = true
+
+# Development environment
+[env.dev]
+name = "shart-platform-dev"
+main = "./dist/_worker.js/index.js"
+compatibility_date = "2025-03-25"
+compatibility_flags = [ "nodejs_compat" ]
+
+[[env.dev.routes]]
+pattern = "dev.shart.cloud"
+custom_domain = true
+
+# D1 Database binding (shared with platform-api dev)
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "shart-ctf-db-dev"
+database_id = "5b4238d6-1fdb-4716-bea7-29d3278f5b40"
