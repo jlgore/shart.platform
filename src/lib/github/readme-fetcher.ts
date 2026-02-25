@@ -12,9 +12,12 @@ const resolveToken = () => {
 
 function rewriteRelativeImageUrls(html: string, repo: string, filePath: string, ref: string): string {
   const fileDir = filePath.includes('/') ? filePath.split('/').slice(0, -1).join('/') : '';
+  // Use github.com/raw/ which redirects to media.githubusercontent.com for git-lfs files
+  // and serves content directly for regular files — raw.githubusercontent.com returns
+  // the LFS pointer file (text/plain) instead of the actual content for lfs-tracked assets.
   const rawBase = fileDir
-    ? `https://raw.githubusercontent.com/${repo}/${ref}/${fileDir}/`
-    : `https://raw.githubusercontent.com/${repo}/${ref}/`;
+    ? `https://github.com/${repo}/raw/${ref}/${fileDir}/`
+    : `https://github.com/${repo}/raw/${ref}/`;
 
   return html.replace(/(<img\b[^>]+\bsrc=)(["'])([^"']+)\2/gi, (_match, prefix, quote, src) => {
     if (/^(https?:\/\/|\/\/|data:)/i.test(src)) return _match;
