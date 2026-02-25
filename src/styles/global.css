@@ -1,4 +1,4 @@
-/* Fonts - with font-display for better loading */
+/* Fonts */
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/700.css';
 @import '@fontsource/orbitron/700.css';
@@ -6,38 +6,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ============================================
-   Theme System - CSS Custom Properties
-   ============================================ */
-
-:root {
-  /* Default: Amber theme - warm phosphor terminal */
-  --color-primary: #d4b896;
-  --color-primary-bright: #ffcc66;
-  --color-primary-muted: #c4a882;
-  --color-primary-subtle: #a08060;
-  --color-accent: #ff9944;
-  --color-accent-muted: #cc7733;
-  --color-error: #ff6b6b;
-  --color-bg: #0a0600;
-  --color-bg-elevated: #141008;
-  --color-border: #3d2a14;
-}
-
-/* Sage theme - cool muted green */
-[data-theme="sage"] {
-  --color-primary: #a8c8a8;
-  --color-primary-bright: #c8e8c8;
-  --color-primary-muted: #8eb88e;
-  --color-primary-subtle: #6a9a6a;
-  --color-accent: #e8b866;
-  --color-accent-muted: #c89844;
-  --color-error: #e07070;
-  --color-bg: #050805;
-  --color-bg-elevated: #0c120c;
-  --color-border: #2a3a2a;
-}
 
 @layer base {
   /* Smooth scroll only for users who don't prefer reduced motion */

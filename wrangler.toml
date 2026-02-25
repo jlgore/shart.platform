@@ -25,15 +25,6 @@ routes = [
   { pattern = "www.shart.cloud/*", zone_name = "shart.cloud" }
 ]
 
-[env.prod.vars]
-API_BASE_URL = "https://platform.shart.cloud"
-
-# D1 Database binding (shared with platform-api)
-[[env.prod.d1_databases]]
-binding = "DB"
-database_name = "shart-ctf-db"
-database_id = "786fbd4c-fefe-49ba-b64f-0d345d8bac1b"
-
 [assets]
 binding = "ASSETS"
 directory = "./dist"

@@ -5,7 +5,7 @@ date: 2025-11-18
 author: "Jared Gore"
 category: "cloud-security"
 tags: ["terraform", "ansible", "explainer"]
-image: "../../assets/images/tfvsansible.png"
+image: "tfvsansible.png" 
 readTime: 10
 draft: false
 ---
