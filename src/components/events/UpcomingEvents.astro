@@ -46,18 +46,17 @@ function formatSpeakerLabel(names: string[]): string {
         const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
         return (
           <li class="flex items-center justify-between gap-4">
-            <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-term-green-dark">
+            <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-theme-bright">
               {label ? `${label} @ ${e.data.title}` : e.data.title}
               {isExternal ? ' ↗' : ''}
             </a>
-            <span class="text-xs text-term-green/70">{dateStr}</span>
+            <span class="text-xs text-theme-subtle">{dateStr}</span>
           </li>
         );
       })}
     </ul>
     <p class="mt-4 text-sm">
-      <a class="hover:text-term-green-dark" href="/events">View all events →</a>
+      <a class="hover:text-theme-bright" href="/events">View all events →</a>
     </p>
   </section>
 )}
-

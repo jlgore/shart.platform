@@ -1,0 +1,209 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { discoverCourseDocs } from '../../../lib/github/course-discovery.js';
+
+export async function getStaticPaths() {
+  const courses = await getCollection('courses', ({ data }) => data.draft !== true && data.isActive !== false);
+  return courses.map((course) => ({
+    params: { courseSlug: course.slug },
+    props: { course },
+  }));
+}
+
+interface Props {
+  course: CollectionEntry<'courses'>;
+}
+
+const courseFromProps = (Astro.props as Partial<Props>).course;
+const courseSlug = Astro.params.courseSlug;
+const allCourses = await getCollection('courses', ({ data }) => data.draft !== true && data.isActive !== false);
+const course = courseFromProps ?? allCourses.find((entry) => entry.slug === courseSlug);
+
+if (!course) {
+  throw new Error(`Course not found: ${courseSlug}`);
+}
+
+const token = (import.meta as any).env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+
+let docs = [] as Awaited<ReturnType<typeof discoverCourseDocs>>;
+try {
+  docs = await discoverCourseDocs({
+    repo: course.data.githubRepo,
+    ref: course.data.defaultRef,
+    weekPattern: course.data.weekPattern,
+    labPattern: course.data.labPattern,
+    token,
+  });
+} catch {
+  docs = [];
+}
+
+const weekDocs = docs.filter((doc) => doc.kind === 'week');
+const labDocs = docs.filter((doc) => doc.kind === 'lab');
+const weekNumbers = [...new Set(docs.map((doc) => doc.weekNumber))].sort((a, b) => a - b);
+
+const difficultyGlyph: Record<string, string> = {
+  beginner: '●○○',
+  intermediate: '●●○',
+  advanced: '●●●',
+};
+---
+
+<BaseLayout title={course.data.title} description={course.data.description}>
+  <div class="course-overview">
+    <nav class="course-breadcrumb">
+      <a href="/courses">Courses</a>
+      <span>→</span>
+      <span>{course.data.title}</span>
+    </nav>
+
+    <header class="course-header">
+      <p class="course-header__kicker">[COURSE]</p>
+      <h1>{course.data.title}</h1>
+      <p>{course.data.description}</p>
+      <div class="course-header__meta">
+        <span>{difficultyGlyph[course.data.difficulty]} {course.data.difficulty.toUpperCase()}</span>
+        <span>{weekDocs.length} week docs</span>
+        <span>{labDocs.length} lab docs</span>
+      </div>
+      <a href={`https://github.com/${course.data.githubRepo}`} target="_blank" rel="noopener noreferrer">View source repo ↗</a>
+    </header>
+
+    <section class="course-map">
+      {weekNumbers.length === 0 ? (
+        <div class="course-empty">
+          <p>Unable to discover markdown docs from GitHub right now.</p>
+          <p>Set <code>GITHUB_TOKEN</code> to improve API reliability during builds.</p>
+        </div>
+      ) : weekNumbers.map((weekNumber) => {
+        const weekDoc = weekDocs.find((doc) => doc.weekNumber === weekNumber);
+        const labsForWeek = labDocs.filter((doc) => doc.weekNumber === weekNumber);
+        return (
+          <article class="course-week">
+            <h2>Week {weekNumber}</h2>
+            {weekDoc ? (
+              <p><a href={`/courses/${course.slug}/${weekDoc.path}`}>Open week overview</a></p>
+            ) : (
+              <p class="course-missing">No week overview markdown found.</p>
+            )}
+            {labsForWeek.length > 0 && (
+              <ul>
+                {labsForWeek.map((lab) => (
+                  <li><a href={`/courses/${course.slug}/${lab.path}`}>{lab.title}</a></li>
+                ))}
+              </ul>
+            )}
+          </article>
+        );
+      })}
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .course-overview {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .course-breadcrumb {
+    display: flex;
+    gap: 0.5rem;
+    color: var(--color-primary-muted);
+    font-size: 0.8rem;
+  }
+
+  .course-breadcrumb a {
+    color: var(--color-primary-muted);
+    text-decoration: none;
+  }
+
+  .course-breadcrumb a:hover {
+    color: var(--color-primary);
+  }
+
+  .course-header {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    padding: 1.25rem;
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .course-header h1,
+  .course-header p {
+    margin: 0;
+  }
+
+  .course-header__kicker {
+    margin: 0;
+    color: var(--color-accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .course-header__meta {
+    display: flex;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    color: var(--color-primary-subtle);
+    font-size: 0.8rem;
+  }
+
+  .course-map {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .course-week {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-elevated);
+    padding: 1rem;
+  }
+
+  .course-week h2 {
+    margin: 0 0 0.45rem;
+    font-size: 1rem;
+  }
+
+  .course-week p {
+    margin: 0;
+  }
+
+  .course-week ul {
+    margin: 0.6rem 0 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .course-week a {
+    color: var(--color-primary);
+  }
+
+  .course-week a:hover {
+    color: var(--color-primary-bright);
+  }
+
+  .course-missing {
+    color: var(--color-primary-subtle);
+    font-size: 0.85rem;
+  }
+
+  .course-empty {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+    border-radius: 6px;
+    padding: 1rem;
+    color: var(--color-primary-subtle);
+  }
+
+  .course-empty p {
+    margin: 0;
+  }
+</style>

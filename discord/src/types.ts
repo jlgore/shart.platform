@@ -35,6 +35,18 @@ export interface VoiceChannelConfig extends BaseChannelConfig {
   userLimit?: number; // 0 = unlimited
 }
 
+export type EventEntityType = 'voice' | 'stage' | 'external';
+
+export interface EventConfig {
+  name: string;
+  description?: string;
+  startTime: string; // ISO string
+  endTime?: string; // required for external
+  entityType: EventEntityType;
+  channel?: string; // role-like ref: name or id:<id> (voice/stage)
+  location?: string; // required for external
+}
+
 export interface CategoryChannelConfig extends BaseChannelConfig {
   type: 'category';
   channels?: Array<TextChannelConfig | VoiceChannelConfig>;
@@ -50,5 +62,5 @@ export interface GuildConfig {
   pruneExtraneous?: boolean; // delete roles/channels not in config
   roles?: RoleConfig[];
   channels?: AnyChannelConfig[];
+  events?: EventConfig[];
 }
-

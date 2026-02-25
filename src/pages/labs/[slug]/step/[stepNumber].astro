@@ -103,9 +103,9 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
   <main class="container mx-auto px-4 py-8">
     <!-- Breadcrumb -->
     <nav class="flex items-center gap-2 text-sm text-gray-400 mb-6">
-      <a href="/labs" class="hover:text-term-green-dark">Labs</a>
+      <a href="/labs" class="hover:text-theme-bright">Labs</a>
       <span>→</span>
-      <a href={`/labs/${lab.slug}`} class="hover:text-term-green-dark">{lab.data.title}</a>
+      <a href={`/labs/${lab.slug}`} class="hover:text-theme-bright">{lab.data.title}</a>
       <span>→</span>
       <span>Step {stepNumber}</span>
     </nav>
@@ -113,15 +113,15 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
     <!-- Lab Header -->
     <header class="mb-8">
       <h1 class="text-3xl font-bold mb-2">{lab.data.title}</h1>
-      <h2 class="text-xl text-term-green mb-4">Step {stepNumber}: {currentStepData.title}</h2>
+      <h2 class="text-xl text-theme-primary mb-4">Step {stepNumber}: {currentStepData.title}</h2>
 
       <div class="flex items-center gap-4 text-sm text-gray-400">
-        <span>Branch: <code class="font-mono text-term-green">{currentStepData.branchName}</code></span>
+        <span>Branch: <code class="font-mono text-theme-primary">{currentStepData.branchName}</code></span>
         <a
           href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-term-green-dark"
+          class="hover:text-theme-bright"
         >
           View on GitHub ↗
         </a>
@@ -138,7 +138,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
 
     <!-- Step Content -->
     <article class="mb-8">
-      <div class="border border-term-green/30 rounded-lg p-6 mb-6">
+      <div class="border border-theme-primary/30 rounded-lg p-6 mb-6">
         <h3 class="text-lg font-semibold mb-4">Step {stepNumber}: {currentStepData.title}</h3>
 
         <!-- Lab Variables: paste Terraform output and define placeholders -->
@@ -154,7 +154,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
           <div id="lab-vars-content" class="space-y-2">
             <textarea id="tf-output" class="w-full bg-black border border-gray-600 rounded p-2 text-sm font-mono" rows="4" placeholder="terraform output or terraform output -json"></textarea>
             <div class="flex gap-2">
-              <button id="btn-parse-tf" class="px-3 py-1 text-xs border border-term-green/60 text-term-green rounded hover:bg-term-green/10">Parse Outputs</button>
+              <button id="btn-parse-tf" class="px-3 py-1 text-xs border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10">Parse Outputs</button>
               <button id="btn-apply-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Apply to Commands</button>
               <button id="btn-clear-vars" class="px-3 py-1 text-xs border border-gray-600 rounded hover:bg-gray-700">Clear</button>
             </div>
@@ -207,7 +207,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
             {stepNumber < totalSteps && (
               <a
                 href={`/labs/${lab.slug}/step/${stepNumber + 1}`}
-                class="px-3 py-1 text-sm border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors"
+                class="px-3 py-1 text-sm border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10 transition-colors"
               >
                 Next →
               </a>
@@ -217,14 +217,14 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
       </div>
 
       <!-- Bug Report Notice -->
-      <div class="mt-6 border border-term-green/30 rounded-lg p-4 bg-term-green/5">
+      <div class="mt-6 border border-theme-primary/30 rounded-lg p-4 bg-theme-primary/5">
         <p class="text-sm text-gray-300">
           Found a bug or issue with this lab step?
           <a
             href={`https://github.com/${lab.data.githubRepo}/issues`}
             target="_blank"
             rel="noopener noreferrer"
-            class="text-term-green hover:text-term-green-dark underline"
+            class="text-theme-primary hover:text-theme-bright underline"
           >
             Open an issue on GitHub ↗
           </a>
@@ -247,7 +247,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
             href={`https://github.com/${lab.data.githubRepo}/tree/${currentStepData.branchName}`}
             target="_blank"
             rel="noopener noreferrer"
-            class="px-4 py-2 border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors"
+            class="px-4 py-2 border border-theme-primary/60 text-theme-primary rounded hover:bg-theme-primary/10 transition-colors"
           >
             View Branch on GitHub ↗
           </a>
@@ -278,7 +278,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
       const storageKey = `labVars:${labSlug}`;
       const readme = document.getElementById('readme-container');
       const varsList = document.getElementById('vars-list');
-      const tfTextarea = document.getElementById('tf-output');
+      const tfTextarea = document.getElementById('tf-output') as HTMLTextAreaElement | null;
       const btnParse = document.getElementById('btn-parse-tf');
       const btnApply = document.getElementById('btn-apply-vars');
       const btnClear = document.getElementById('btn-clear-vars');
@@ -286,14 +286,16 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
       const varsToggle = document.getElementById('toggle-lab-vars');
       const collapsedKey = `labVarsCollapsed:${labSlug}`;
 
-      function loadVars() {
+      type VarsMap = Record<string, string>;
+
+      function loadVars(): VarsMap {
         try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
       }
-      function saveVars(obj) {
+      function saveVars(obj: VarsMap) {
         localStorage.setItem(storageKey, JSON.stringify(obj || {}));
       }
 
-      function toVarKey(k) {
+      function toVarKey(k: string | null | undefined): string {
         return String(k || '')
           .trim()
           .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
@@ -301,8 +303,8 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
           .toUpperCase();
       }
 
-      function detectPlaceholders() {
-        const keys = new Set();
+      function detectPlaceholders(): Set<string> {
+        const keys = new Set<string>();
         if (!readme) return keys;
         readme.querySelectorAll('code').forEach((el) => {
           const t = el.textContent || '';
@@ -313,35 +315,44 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
         return keys;
       }
 
-      function renderVarInputs(varsMap, expectedKeys) {
+      function renderVarInputs(varsMap: VarsMap, expectedKeys: Set<string> | string[]) {
         if (!varsList) return;
         varsList.innerHTML = '';
-        const schemaKeys = Array.isArray(expectedSchema) ? expectedSchema.map((v) => (v && v.key ? String(v.key) : '')).filter(Boolean).map(toVarKey) : [];
+        const schemaKeys = Array.isArray(expectedSchema) ? expectedSchema.map((v: any) => (v && v.key ? String(v.key) : '')).filter(Boolean).map(toVarKey) : [];
         const keys = Array.from(new Set([...(expectedKeys || []), ...schemaKeys, ...Object.keys(varsMap || {})])).sort();
         for (const k of keys) {
           const id = `var-${k}`;
           const value = varsMap[k] ?? '';
           const wrap = document.createElement('div');
           wrap.className = 'flex items-center gap-2';
-          wrap.innerHTML = `
-            <label for="${id}" class="text-xs text-gray-400 min-w-[10rem]">${k}</label>
-            <input id="${id}" data-var-key="${k}" class="flex-1 bg-black border border-gray-600 rounded p-1 text-sm font-mono" value="${value.toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" />
-          `;
+          const label = document.createElement('label');
+          label.htmlFor = id;
+          label.className = 'text-xs text-gray-400 min-w-[10rem]';
+          label.textContent = k;
+
+          const input = document.createElement('input');
+          input.id = id;
+          input.setAttribute('data-var-key', k);
+          input.className = 'flex-1 bg-black border border-gray-600 rounded p-1 text-sm font-mono';
+          input.value = String(value);
+
+          wrap.appendChild(label);
+          wrap.appendChild(input);
           varsList.appendChild(wrap);
         }
       }
 
-      function collectVarsFromInputs() {
-        const map = {};
+      function collectVarsFromInputs(): VarsMap {
+        const map: VarsMap = {};
         varsList?.querySelectorAll('input[data-var-key]').forEach((inp) => {
           const key = inp.getAttribute('data-var-key');
           if (!key) return;
-          map[key] = inp.value.trim();
+          map[key] = (inp as HTMLInputElement).value.trim();
         });
         return map;
       }
 
-      function applyVars(map) {
+      function applyVars(map: VarsMap) {
         if (!readme) return;
         const keys = Object.keys(map || {});
         if (keys.length === 0) return;
@@ -369,8 +380,8 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
         });
       }
 
-      function parseTerraformOutputs(text) {
-        const out = {};
+      function parseTerraformOutputs(text: string): VarsMap {
+        const out: VarsMap = {};
         if (!text) return out;
         const trimmed = text.trim();
         // JSON mode from `terraform output -json`
@@ -429,7 +440,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
                 blockLines.push(ln);
               }
             }
-            const obj = {};
+            const obj: Record<string, any> = {};
             for (const bl of blockLines) {
               const lineTrim = bl.trim();
               if (!lineTrim) continue;
@@ -516,27 +527,6 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
         });
       }
 
-      // Very conservative client-side sanitizer
-      function clientSanitizeHtml(input) {
-        if (!input) return '';
-        let out = String(input);
-        // Remove script blocks completely
-        out = out.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
-        // Remove dangerous tags (keep inner text)
-        out = out.replace(/<\/?\s*(iframe|object|embed|style|link|meta|base|form)[^>]*>/gi, '');
-        // Neutralize javascript: URLs
-        out = out.replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
-        out = out.replace(/(href|src)\s*=\s*javascript:[^\s>]+/gi, '$1="#"');
-        // Strip inline event handlers and srcdoc
-        out = out.replace(/\s+on[a-z]+\s*=\s*(["']).*?\1/gi, '');
-        out = out.replace(/\s+on[a-z]+\s*=\s*[^\s>]+/gi, '');
-        out = out.replace(/\s+srcdoc\s*=\s*(["']).*?\1/gi, '');
-        // Remove inline styles entirely
-        out = out.replace(/\s+style\s*=\s*(["']).*?\1/gi, '');
-        out = out.replace(/\s+style\s*=\s*[^\s>]+/gi, '');
-        return out;
-      }
-
       async function ensureReadmeLoaded() {
         if (!readme) return;
         const content = (readme.innerHTML || '').trim();
@@ -544,23 +534,7 @@ const pageTitle = `${lab.data.title} - ${currentStepData.title}`;
         const looksEmpty = content.length === 0;
         const hasFallback = /Unable to load README|README content will appear here/.test(text);
         if (!(looksEmpty || hasFallback)) return;
-        try {
-          const repo = readme.getAttribute('data-repo');
-          const branch = readme.getAttribute('data-branch') || 'main';
-          if (!repo) return;
-          const res = await fetch(`https://api.github.com/repos/${repo}/readme?ref=${encodeURIComponent(branch)}`, {
-            headers: { 'Accept': 'application/vnd.github.v3.html' }
-          });
-          if (!res.ok) return;
-          const html = await res.text();
-          const safe = clientSanitizeHtml(html);
-          readme.innerHTML = safe;
-          // Re-apply any variable replacements now that content exists
-          const stored = loadVars();
-          applyVars(stored);
-          // Refresh inputs with any newly detected placeholders
-          renderVarInputs(stored, detectPlaceholders());
-        } catch {}
+        return;
       }
 
       btnParse?.addEventListener('click', () => {

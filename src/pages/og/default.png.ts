@@ -8,8 +8,7 @@ export const prerender = true;
 export const GET: APIRoute = async () => {
   const svg = await buildOgSvg({
     title: 'SHART.CLOUD',
-    author: 'Cloud Security, But Weird',
-    description: 'Blog, CTFs, labs and irreverent training',
+    description: 'Cloud Security, But Weird - Blog, CTFs, labs and irreverent training',
     templatePath: path.join(process.cwd(), 'public', 'og-blank.svg'),
   });
 
@@ -18,7 +17,7 @@ export const GET: APIRoute = async () => {
     const fontOptions = await getFontOptions();
     const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 }, ...fontOptions });
     const png = resvg.render().asPng();
-    return new Response(png, {
+    return new Response(png as unknown as BodyInit, {
       headers: {
         'content-type': 'image/png',
         'cache-control': 'public, max-age=31536000, immutable',

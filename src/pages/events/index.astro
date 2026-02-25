@@ -6,8 +6,8 @@ const { upcoming, past } = await getAllEventsSorted();
 ---
 
 <BaseLayout title="Events">
-  <h1 class="text-2xl font-bold text-term-green uppercase">Events</h1>
-  <p class="text-term-green/80 mt-2 mb-6">Talks, streams, and appearances. Catch us live or browse the archive.</p>
+  <h1 class="text-2xl font-bold text-theme-primary uppercase">Events</h1>
+  <p class="text-theme-muted mt-2 mb-6">Talks, streams, and appearances. Catch us live or browse the archive.</p>
 
   {upcoming.length > 0 && (
     <section class="terminal-window mb-8">
@@ -19,8 +19,8 @@ const { upcoming, past } = await getAllEventsSorted();
           const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
           return (
             <li class="flex items-center justify-between gap-4">
-              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-term-green-dark">{e.data.title}{isExternal ? ' ↗' : ''}</a>
-              <span class="text-xs text-term-green/70">{dateStr}</span>
+              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-theme-bright">{e.data.title}{isExternal ? ' ↗' : ''}</a>
+              <span class="text-xs text-theme-subtle">{dateStr}</span>
             </li>
           );
         })}
@@ -40,8 +40,8 @@ const { upcoming, past } = await getAllEventsSorted();
           const dateStr = formatEventDateRange(e.data.startDate, e.data.endDate);
           return (
             <li class="flex items-center justify-between gap-4">
-              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-term-green-dark">{e.data.title}{isExternal ? ' ↗' : ''}</a>
-              <span class="text-xs text-term-green/70">{dateStr}</span>
+              <a href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noopener noreferrer' : undefined} class="hover:text-theme-bright">{e.data.title}{isExternal ? ' ↗' : ''}</a>
+              <span class="text-xs text-theme-subtle">{dateStr}</span>
             </li>
           );
         })}
@@ -49,4 +49,3 @@ const { upcoming, past } = await getAllEventsSorted();
     )}
   </section>
 </BaseLayout>
-

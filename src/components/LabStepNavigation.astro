@@ -12,151 +12,511 @@ export interface Props {
 
 const { labSlug, currentStep, totalSteps, steps } = Astro.props;
 
-// Generate step data if not provided
 const stepData = steps || Array.from({ length: totalSteps }, (_, i) => ({
   stepNumber: i + 1,
   branchName: `branch-${i + 1}`,
   title: `Step ${i + 1}`
 }));
+
+const progressPercent = Math.round((currentStep / totalSteps) * 100);
 ---
 
-<nav class="lab-step-navigation mb-8" data-lab-slug={labSlug} data-total-steps={totalSteps}>
-  <!-- Progress Bar -->
-  <div class="mb-6">
-    <div class="flex items-center justify-between text-sm mb-2">
-      <span class="text-gray-400">Progress</span>
-      <span class="text-term-green" id="progress-text">Step {currentStep} of {totalSteps}</span>
+<nav class="lab-nav" data-lab-slug={labSlug} data-total-steps={totalSteps}>
+  <!-- System Status Header -->
+  <div class="lab-nav__header">
+    <div class="lab-nav__status-line">
+      <span class="lab-nav__prompt">[SYS]</span>
+      <span class="lab-nav__label">MISSION PROGRESS</span>
+      <span class="lab-nav__value" id="progress-text">PHASE {currentStep}/{totalSteps}</span>
     </div>
-    <div class="w-full bg-gray-700 rounded-full h-2">
-      <div
-        class="bg-term-green h-2 rounded-full transition-all duration-300"
-        style={`width: ${Math.round((currentStep / totalSteps) * 100)}%`}
-        id="progress-bar"
-      ></div>
+
+    <!-- Progress Bar -->
+    <div class="lab-nav__progress-track">
+      <div class="lab-nav__progress-fill" style={`--progress: ${progressPercent}%`} id="progress-bar">
+        <span class="lab-nav__progress-glow"></span>
+      </div>
+      <div class="lab-nav__progress-markers">
+        {stepData.map((_, i) => (
+          <span
+            class={`lab-nav__marker ${i + 1 <= currentStep ? 'lab-nav__marker--active' : ''}`}
+            style={`left: ${((i + 1) / totalSteps) * 100}%`}
+          />
+        ))}
+      </div>
     </div>
-    <div class="text-xs text-gray-400 mt-1">
-      <span id="completion-percentage">{Math.round((currentStep / totalSteps) * 100)}%</span> Complete
+
+    <div class="lab-nav__stats">
+      <span id="completion-percentage">{progressPercent}%</span> COMPLETE
+      <span class="lab-nav__divider">|</span>
+      <span>{totalSteps - currentStep} PHASES REMAINING</span>
     </div>
   </div>
 
-  <!-- Step Navigation -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+  <!-- Step Grid -->
+  <div class="lab-nav__grid">
     {stepData.map((step) => {
       const isCurrent = step.stepNumber === currentStep;
       const isCompleted = step.stepNumber < currentStep;
       const isLocked = step.stepNumber > currentStep;
 
-      const statusIcon = isCompleted ? '✓' : isCurrent ? '●' : '○';
-      const statusText = isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Locked';
-
-      const baseClasses = 'step-item p-3 border rounded-lg text-sm transition-all duration-200';
-      const statusClasses = isCompleted
-        ? 'border-term-green/60 bg-term-green/10 text-term-green cursor-pointer hover:bg-term-green/20'
-        : isCurrent
-          ? 'border-term-green bg-term-green/20 text-term-green'
-          : 'border-gray-600 text-gray-400 cursor-not-allowed';
+      const statusCode = isCompleted ? 'CLEAR' : isCurrent ? 'ACTIVE' : 'LOCKED';
+      const statusIcon = isCompleted ? '■' : isCurrent ? '▶' : '○';
 
       return (
-        <div
-          class={`${baseClasses} ${statusClasses}`}
+        <button
+          class={`lab-nav__step ${isCompleted ? 'lab-nav__step--completed' : ''} ${isCurrent ? 'lab-nav__step--current' : ''} ${isLocked ? 'lab-nav__step--locked' : ''}`}
           data-step={step.stepNumber}
           data-branch={step.branchName}
-          data-status={statusText.toLowerCase()}
-          role="button"
-          tabindex={isLocked ? -1 : 0}
+          data-status={statusCode.toLowerCase()}
+          disabled={isLocked}
           aria-disabled={isLocked}
+          type="button"
         >
-          <div class="flex items-center gap-2 mb-1">
-            <span class="font-mono text-xs">{statusIcon}</span>
-            <span class="font-semibold">Step {step.stepNumber}</span>
+          <div class="lab-nav__step-header">
+            <span class="lab-nav__step-icon">{statusIcon}</span>
+            <span class="lab-nav__step-num">PHASE_{String(step.stepNumber).padStart(2, '0')}</span>
           </div>
-          <div class="text-xs opacity-80">
-            {step.title || `Branch ${step.stepNumber}`}
-          </div>
-          <div class="text-xs opacity-60 mt-1">
-            {statusText}
-          </div>
-        </div>
+          <div class="lab-nav__step-title">{step.title || `Step ${step.stepNumber}`}</div>
+          <div class="lab-nav__step-status">[{statusCode}]</div>
+        </button>
       );
     })}
   </div>
 
-  <!-- Action Buttons -->
-  <div class="flex items-center justify-between gap-4">
-    <div class="flex gap-2">
-      <button
-        id="prev-step"
-        class="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={currentStep <= 1}
-      >
-        ← Previous Step
+  <!-- Action Bar -->
+  <div class="lab-nav__actions">
+    <div class="lab-nav__actions-group">
+      <button id="prev-step" class="lab-nav__btn lab-nav__btn--secondary" disabled={currentStep <= 1}>
+        <span class="lab-nav__btn-icon">◄</span> PREV
       </button>
-      <button
-        id="next-step"
-        class="px-4 py-2 border border-term-green/60 text-term-green rounded hover:bg-term-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={currentStep >= totalSteps}
-      >
-        Next Step →
+      <button id="next-step" class="lab-nav__btn lab-nav__btn--primary" disabled={currentStep >= totalSteps}>
+        NEXT <span class="lab-nav__btn-icon">►</span>
       </button>
     </div>
 
-    <div class="flex gap-2">
-      <button
-        id="mark-complete"
-        class="px-4 py-2 bg-term-green/20 border border-term-green/60 text-term-green rounded hover:bg-term-green/30 transition-colors"
-      >
-        Mark Complete
+    <div class="lab-nav__actions-group">
+      <button id="mark-complete" class="lab-nav__btn lab-nav__btn--accent">
+        <span class="lab-nav__btn-icon">✓</span> MARK COMPLETE
       </button>
-      <button
-        id="reset-progress"
-        class="px-3 py-2 border border-red-500/60 text-red-400 rounded hover:bg-red-500/10 transition-colors text-sm"
-        title="Reset lab progress"
-      >
-        Reset
+      <button id="reset-progress" class="lab-nav__btn lab-nav__btn--danger" title="Reset progress">
+        RESET
       </button>
     </div>
   </div>
 
-  <!-- Current Step Info -->
-  <div class="mt-6 p-4 border border-term-green/30 rounded-lg bg-term-green/5">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="font-semibold text-term-green">
-        Current Step: {stepData.find(s => s.stepNumber === currentStep)?.title || `Step ${currentStep}`}
-      </h3>
-      <div class="text-sm text-gray-400">
-        Branch: <code class="font-mono text-term-green">{stepData.find(s => s.stepNumber === currentStep)?.branchName}</code>
+  <!-- Current Step Command Panel -->
+  <div class="lab-nav__terminal">
+    <div class="lab-nav__terminal-header">
+      <span class="lab-nav__terminal-dots">
+        <span></span><span></span><span></span>
+      </span>
+      <span class="lab-nav__terminal-title">BRANCH CHECKOUT</span>
+    </div>
+    <div class="lab-nav__terminal-body">
+      <div class="lab-nav__terminal-line">
+        <span class="lab-nav__terminal-prompt">$</span>
+        <code id="git-command">git checkout {stepData.find(s => s.stepNumber === currentStep)?.branchName}</code>
+        <button id="copy-git-command" class="lab-nav__copy-btn" title="Copy command">
+          <span class="lab-nav__copy-icon">⎘</span>
+          <span class="lab-nav__copy-text">COPY</span>
+        </button>
       </div>
-    </div>
-
-    <div class="text-sm text-gray-300 mb-3">
-      Switch to this step's branch to follow along with the tutorial:
-    </div>
-
-    <div class="flex items-center gap-2">
-      <code class="flex-1 p-2 bg-gray-800 rounded font-mono text-sm" id="git-command">
-        git checkout {stepData.find(s => s.stepNumber === currentStep)?.branchName}
-      </code>
-      <button
-        id="copy-git-command"
-        class="px-3 py-2 border border-gray-600 rounded hover:bg-gray-700 transition-colors text-sm"
-        title="Copy git command"
-      >
-        📋 Copy
-      </button>
     </div>
   </div>
 </nav>
+
+<style>
+  .lab-nav {
+    --nav-gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--nav-gap);
+    margin-bottom: 2rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Header & Progress */
+  .lab-nav__header {
+    padding: 1rem;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+
+  .lab-nav__status-line {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .lab-nav__prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .lab-nav__label {
+    color: var(--color-primary-muted);
+  }
+
+  .lab-nav__value {
+    color: var(--color-primary);
+    margin-left: auto;
+    font-weight: 700;
+  }
+
+  .lab-nav__progress-track {
+    position: relative;
+    height: 6px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 1px;
+    overflow: visible;
+  }
+
+  .lab-nav__progress-fill {
+    position: relative;
+    height: 100%;
+    width: var(--progress);
+    background: var(--color-primary);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .lab-nav__progress-glow {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 12px;
+    background: var(--color-primary-bright);
+    box-shadow:
+      0 0 8px var(--color-primary),
+      0 0 16px var(--color-primary);
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .lab-nav__progress-markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .lab-nav__marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 10px;
+    background: var(--color-border);
+    transition: background 0.2s;
+  }
+
+  .lab-nav__marker--active {
+    background: var(--color-primary);
+  }
+
+  .lab-nav__stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-primary-subtle);
+  }
+
+  .lab-nav__divider {
+    opacity: 0.4;
+  }
+
+  /* Step Grid */
+  .lab-nav__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .lab-nav__grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
+
+  .lab-nav__step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+
+  .lab-nav__step:hover:not(:disabled) {
+    border-color: var(--color-primary-muted);
+    background: var(--color-bg-elevated);
+  }
+
+  .lab-nav__step--current {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg));
+    box-shadow:
+      inset 0 0 20px color-mix(in srgb, var(--color-primary) 5%, transparent),
+      0 0 0 1px var(--color-primary);
+  }
+
+  .lab-nav__step--completed {
+    border-color: var(--color-primary-muted);
+  }
+
+  .lab-nav__step--completed .lab-nav__step-icon {
+    color: var(--color-primary);
+  }
+
+  .lab-nav__step--locked {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .lab-nav__step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .lab-nav__step-icon {
+    color: var(--color-accent);
+    font-size: 0.5rem;
+  }
+
+  .lab-nav__step-num {
+    color: var(--color-primary-muted);
+  }
+
+  .lab-nav__step-title {
+    font-size: 0.75rem;
+    color: var(--color-primary);
+    font-weight: 500;
+    line-height: 1.3;
+    min-height: 2em;
+  }
+
+  .lab-nav__step-status {
+    font-size: 0.5625rem;
+    color: var(--color-primary-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .lab-nav__step--current .lab-nav__step-status {
+    color: var(--color-accent);
+  }
+
+  /* Action Bar */
+  .lab-nav__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .lab-nav__actions-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .lab-nav__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    background: var(--color-bg);
+    color: var(--color-primary-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lab-nav__btn:hover:not(:disabled) {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .lab-nav__btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .lab-nav__btn--primary {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .lab-nav__btn--primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 15%, var(--color-bg));
+    border-color: var(--color-primary);
+  }
+
+  .lab-nav__btn--accent {
+    border-color: var(--color-accent-muted);
+    color: var(--color-accent);
+  }
+
+  .lab-nav__btn--accent:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg));
+    border-color: var(--color-accent);
+  }
+
+  .lab-nav__btn--danger {
+    border-color: var(--color-error);
+    color: var(--color-error);
+    opacity: 0.7;
+  }
+
+  .lab-nav__btn--danger:hover:not(:disabled) {
+    opacity: 1;
+    background: color-mix(in srgb, var(--color-error) 10%, var(--color-bg));
+  }
+
+  .lab-nav__btn-icon {
+    font-size: 0.5rem;
+  }
+
+  /* Terminal Panel */
+  .lab-nav__terminal {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .lab-nav__terminal-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .lab-nav__terminal-dots {
+    display: flex;
+    gap: 4px;
+  }
+
+  .lab-nav__terminal-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-border);
+  }
+
+  .lab-nav__terminal-dots span:first-child {
+    background: var(--color-error);
+    opacity: 0.7;
+  }
+
+  .lab-nav__terminal-dots span:nth-child(2) {
+    background: var(--color-accent);
+    opacity: 0.7;
+  }
+
+  .lab-nav__terminal-dots span:last-child {
+    background: var(--color-primary);
+    opacity: 0.7;
+  }
+
+  .lab-nav__terminal-title {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-primary-subtle);
+  }
+
+  .lab-nav__terminal-body {
+    padding: 0.75rem;
+  }
+
+  .lab-nav__terminal-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .lab-nav__terminal-prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .lab-nav__terminal-line code {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: var(--color-primary);
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .lab-nav__copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.5625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary-muted);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lab-nav__copy-btn:hover {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .lab-nav__copy-icon {
+    font-size: 0.875rem;
+  }
+</style>
 
 <script>
   import { labProgress } from '../lib/lab-progress.ts';
 
   class LabStepNavigation {
-    private labSlug: string;
-    private totalSteps: number;
+    private labSlug!: string;
+    private totalSteps!: number;
     private progressManager = labProgress;
 
     constructor() {
-      const nav = document.querySelector('.lab-step-navigation') as HTMLElement;
+      const nav = document.querySelector('.lab-nav') as HTMLElement;
       if (!nav) return;
 
       this.labSlug = nav.dataset.labSlug!;
@@ -172,61 +532,56 @@ const stepData = steps || Array.from({ length: totalSteps }, (_, i) => ({
     }
 
     private bindEvents() {
-      // Step navigation
-      document.querySelectorAll('.step-item').forEach(item => {
+      document.querySelectorAll('.lab-nav__step').forEach(item => {
         item.addEventListener('click', (e) => {
-          const target = e.currentTarget as HTMLElement;
+          const target = e.currentTarget as HTMLButtonElement;
+          if (target.disabled) return;
           const step = parseInt(target.dataset.step!);
-          const status = target.dataset.status;
-
-          if (status !== 'locked') {
-            this.goToStep(step);
-          }
+          this.goToStep(step);
         });
       });
 
-      // Action buttons
       document.getElementById('prev-step')?.addEventListener('click', () => {
         const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
-        if (current > 1) {
-          this.goToStep(current - 1);
-        }
+        if (current > 1) this.goToStep(current - 1);
       });
 
       document.getElementById('next-step')?.addEventListener('click', () => {
         const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
-        if (current < this.totalSteps) {
-          this.goToStep(current + 1);
-        }
+        if (current < this.totalSteps) this.goToStep(current + 1);
       });
 
       document.getElementById('mark-complete')?.addEventListener('click', () => {
         const current = this.progressManager.getProgress(this.labSlug)?.currentStep || 1;
         this.progressManager.markStepComplete(this.labSlug, current);
         this.updateUI();
-      });
 
-      document.getElementById('reset-progress')?.addEventListener('click', () => {
-        if (confirm('Are you sure you want to reset your progress for this lab?')) {
-          this.progressManager.resetProgress(this.labSlug);
-          this.initializeProgress();
-          this.updateUI();
-          window.location.reload(); // Refresh to reset to step 1
+        // Visual feedback
+        const btn = document.getElementById('mark-complete');
+        if (btn) {
+          btn.textContent = '✓ MARKED';
+          setTimeout(() => {
+            btn.innerHTML = '<span class="lab-nav__btn-icon">✓</span> MARK COMPLETE';
+          }, 1500);
         }
       });
 
-      // Copy git command
+      document.getElementById('reset-progress')?.addEventListener('click', () => {
+        if (confirm('Reset all progress for this lab?')) {
+          this.progressManager.resetProgress(this.labSlug);
+          this.initializeProgress();
+          window.location.reload();
+        }
+      });
+
       document.getElementById('copy-git-command')?.addEventListener('click', () => {
         const command = document.getElementById('git-command')?.textContent;
         if (command) {
           navigator.clipboard.writeText(command.trim()).then(() => {
-            const button = document.getElementById('copy-git-command');
-            if (button) {
-              const original = button.textContent;
-              button.textContent = '✓ Copied!';
-              setTimeout(() => {
-                button.textContent = original;
-              }, 2000);
+            const textEl = document.querySelector('.lab-nav__copy-text');
+            if (textEl) {
+              textEl.textContent = 'COPIED';
+              setTimeout(() => { textEl.textContent = 'COPY'; }, 1500);
             }
           });
         }
@@ -242,76 +597,40 @@ const stepData = steps || Array.from({ length: totalSteps }, (_, i) => ({
       const progress = this.progressManager.getProgress(this.labSlug);
       if (!progress) return;
 
-      // Update progress bar
       const percentage = this.progressManager.getProgressPercentage(this.labSlug);
-      const progressBar = document.getElementById('progress-bar');
+
+      const progressBar = document.getElementById('progress-bar') as HTMLElement;
       const progressText = document.getElementById('progress-text');
       const completionPercentage = document.getElementById('completion-percentage');
 
-      if (progressBar) {
-        progressBar.style.width = `${percentage}%`;
-      }
-      if (progressText) {
-        progressText.textContent = `Step ${progress.currentStep} of ${this.totalSteps}`;
-      }
-      if (completionPercentage) {
-        completionPercentage.textContent = `${percentage}%`;
-      }
+      if (progressBar) progressBar.style.setProperty('--progress', `${percentage}%`);
+      if (progressText) progressText.textContent = `PHASE ${progress.currentStep}/${this.totalSteps}`;
+      if (completionPercentage) completionPercentage.textContent = `${percentage}%`;
 
-      // Update step items
-      document.querySelectorAll('.step-item').forEach(item => {
-        const stepNum = parseInt((item as HTMLElement).dataset.step!);
+      document.querySelectorAll('.lab-nav__step').forEach(item => {
+        const el = item as HTMLButtonElement;
+        const stepNum = parseInt(el.dataset.step!);
         const isCompleted = progress.completedSteps.includes(stepNum);
         const isCurrent = progress.currentStep === stepNum;
         const isLocked = stepNum > progress.currentStep && !isCompleted;
 
-        // Update classes
-        item.className = item.className.replace(/border-\w+[-\/]\w+/g, '').replace(/bg-\w+[-\/]\w+/g, '').replace(/text-\w+[-\/]?\w*/g, '');
+        el.classList.toggle('lab-nav__step--completed', isCompleted);
+        el.classList.toggle('lab-nav__step--current', isCurrent);
+        el.classList.toggle('lab-nav__step--locked', isLocked);
+        el.disabled = isLocked;
 
-        const baseClasses = 'step-item p-3 border rounded-lg text-sm transition-all duration-200';
-        let statusClasses = '';
-
-        if (isCompleted) {
-          statusClasses = 'border-term-green/60 bg-term-green/10 text-term-green cursor-pointer hover:bg-term-green/20';
-        } else if (isCurrent) {
-          statusClasses = 'border-term-green bg-term-green/20 text-term-green';
-        } else {
-          statusClasses = 'border-gray-600 text-gray-400 cursor-not-allowed';
-        }
-
-        item.className = `${baseClasses} ${statusClasses}`;
-
-        // Update status icon and text
-        const statusIcon = item.querySelector('.font-mono');
-        const statusText = item.querySelector('.opacity-60');
-
-        if (statusIcon) {
-          statusIcon.textContent = isCompleted ? '✓' : isCurrent ? '●' : '○';
-        }
-        if (statusText) {
-          statusText.textContent = isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Locked';
-        }
-
-        // Update accessibility
-        item.setAttribute('aria-disabled', isLocked.toString());
-        item.setAttribute('tabindex', isLocked ? '-1' : '0');
+        const icon = el.querySelector('.lab-nav__step-icon');
+        const status = el.querySelector('.lab-nav__step-status');
+        if (icon) icon.textContent = isCompleted ? '■' : isCurrent ? '▶' : '○';
+        if (status) status.textContent = `[${isCompleted ? 'CLEAR' : isCurrent ? 'ACTIVE' : 'LOCKED'}]`;
       });
 
-      // Update button states
-      const prevButton = document.getElementById('prev-step') as HTMLButtonElement;
-      const nextButton = document.getElementById('next-step') as HTMLButtonElement;
-
-      if (prevButton) {
-        prevButton.disabled = progress.currentStep <= 1;
-      }
-      if (nextButton) {
-        nextButton.disabled = progress.currentStep >= this.totalSteps;
-      }
+      const prevBtn = document.getElementById('prev-step') as HTMLButtonElement;
+      const nextBtn = document.getElementById('next-step') as HTMLButtonElement;
+      if (prevBtn) prevBtn.disabled = progress.currentStep <= 1;
+      if (nextBtn) nextBtn.disabled = progress.currentStep >= this.totalSteps;
     }
   }
 
-  // Initialize when DOM is loaded
-  document.addEventListener('DOMContentLoaded', () => {
-    new LabStepNavigation();
-  });
+  document.addEventListener('DOMContentLoaded', () => new LabStepNavigation());
 </script>

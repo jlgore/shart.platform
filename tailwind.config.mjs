@@ -7,16 +7,55 @@ export default {
   theme: {
     extend: {
       colors: {
-        'term-green': '#33ff33',
-        'term-green-dark': '#00cc00',
-        'term-amber': '#ffb000',
-        'term-red': '#ff3333',
-        'term-black': '#000000',
-        'term-gray': '#003300',
+        // Theme-aware colors using CSS custom properties
+        'theme': {
+          'primary': 'var(--color-primary)',
+          'bright': 'var(--color-primary-bright)',
+          'muted': 'var(--color-primary-muted)',
+          'subtle': 'var(--color-primary-subtle)',
+          'accent': 'var(--color-accent)',
+          'accent-muted': 'var(--color-accent-muted)',
+          'error': 'var(--color-error)',
+          'bg': 'var(--color-bg)',
+          'elevated': 'var(--color-bg-elevated)',
+          'border': 'var(--color-border)',
+        },
+        // Legacy aliases for backwards compatibility during migration
+        'term-green': 'var(--color-primary)',
+        'term-green-dark': 'var(--color-primary-bright)',
+        'term-green-muted': 'var(--color-primary-muted)',
+        'term-green-subtle': 'var(--color-primary-subtle)',
+        'term-amber': 'var(--color-accent)',
+        'term-amber-muted': 'var(--color-accent-muted)',
+        'term-red': 'var(--color-error)',
+        'term-black': 'var(--color-bg)',
+        'term-gray': 'var(--color-bg-elevated)',
+        'term-border': 'var(--color-border)',
       },
       fontFamily: {
         'mono': ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
         'display': ['Orbitron', 'monospace'],
+      },
+      fontSize: {
+        // Custom scale optimized for monospace readability
+        'xs': ['0.75rem', { lineHeight: '1.5' }],      // 12px - meta, timestamps
+        'sm': ['0.875rem', { lineHeight: '1.6' }],    // 14px - secondary text
+        'base': ['1rem', { lineHeight: '1.7' }],      // 16px - body text
+        'lg': ['1.125rem', { lineHeight: '1.6' }],    // 18px - lead text
+        'xl': ['1.25rem', { lineHeight: '1.5' }],     // 20px - h3
+        '2xl': ['1.5rem', { lineHeight: '1.4' }],     // 24px - h2
+        '3xl': ['1.875rem', { lineHeight: '1.3' }],   // 30px - h1
+        '4xl': ['2.25rem', { lineHeight: '1.2' }],    // 36px - display
+        '5xl': ['3rem', { lineHeight: '1.1' }],       // 48px - hero
+      },
+      letterSpacing: {
+        'tighter': '-0.02em',
+        'tight': '-0.01em',
+        'normal': '0',
+        'wide': '0.02em',
+        'wider': '0.05em',
+        'widest': '0.1em',
+        'terminal': '0.05em',  // Slight spacing for terminal feel
       },
       animation: {
         'glow': 'glow 2s ease-in-out infinite alternate',

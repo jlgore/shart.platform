@@ -18,14 +18,33 @@ roles:
       - ManageMessages
       - KickMembers
       - BanMembers
-    position: 3
+    position: 2
+  - name: Lab Rats
+    color: "#FFFFFF"
+    position: 1
+    hoist: true
+    mentionable: true
+    permissions: []
   - name: Members
     color: "#03A9F4"
     mentionable: true
     permissions: []
-    position: 4
+    position: 0
 
 channels:
+  - type: category
+    name: development
+    position: 1
+    overwrites:
+      - role: Admins
+        allow: [ViewChannel, ReadMessageHistory]
+      - role: "@everyone"
+        deny: [ViewChannel]
+    channels:
+      - type: text
+        name: development-text-chat
+      - type: voice
+        name: development-voice-chat
   - type: category
     name: releases
     position: 1
@@ -68,4 +87,3 @@ channels:
       - type: voice
         name: ctf-war-room
         userLimit: 0
-

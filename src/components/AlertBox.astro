@@ -8,9 +8,9 @@ export interface Props {
 const { variant = 'warning', title, class: className = '' } = Astro.props as Props;
 
 const stylesByVariant: Record<string, string> = {
-  info: 'border-term-green/60 ring-term-green/30 text-term-green',
-  success: 'border-term-green/60 ring-term-green/30 text-term-green',
-  warning: 'border-term-amber/80 ring-term-amber/30 text-term-amber',
+  info: 'border-theme-primary/60 ring-theme-primary/30 text-theme-primary',
+  success: 'border-theme-primary/60 ring-theme-primary/30 text-theme-primary',
+  warning: 'border-theme-accent/80 ring-theme-accent/30 text-theme-accent',
 };
 
 const tone = stylesByVariant[variant] ?? stylesByVariant.warning;
@@ -21,8 +21,7 @@ const tone = stylesByVariant[variant] ?? stylesByVariant.warning;
     <span aria-hidden="true">⚠️</span>
     <span class="uppercase tracking-wider text-xs opacity-80">{title ?? 'Announcement'}</span>
   </div>
-  <div class="text-sm text-term-green/90">
+  <div class="text-sm text-theme-primary">
     <slot />
   </div>
 </div>
-

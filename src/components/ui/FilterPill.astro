@@ -1,0 +1,65 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+export interface Props extends HTMLAttributes<'button'> {
+  active?: boolean;
+  tone?: 'default' | 'accent' | 'danger';
+}
+
+const {
+  active = false,
+  tone = 'default',
+  class: className = '',
+  ...attrs
+} = Astro.props as Props;
+---
+
+<button
+  type="button"
+  class:list={['ui-filter-pill', `ui-filter-pill-${tone}`, { 'is-active': active }, className]}
+  {...attrs}
+>
+  <slot />
+</button>
+
+<style>
+  .ui-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    color: var(--color-primary-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ui-filter-pill:hover {
+    border-color: var(--color-primary-muted);
+    color: var(--color-primary);
+  }
+
+  .ui-filter-pill-default.is-active {
+    background: color-mix(in srgb, var(--color-primary) 15%, var(--color-bg));
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .ui-filter-pill-accent.is-active {
+    background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg));
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .ui-filter-pill-danger:hover {
+    color: var(--color-error);
+    border-color: var(--color-error);
+  }
+</style>

@@ -21,6 +21,9 @@ export default defineConfig({
     imageService: 'compile'
   }),
   vite: {
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react/jsx-runtime'],
+    },
     ssr: {
       external: ['node:path', 'node:fs/promises']
     },

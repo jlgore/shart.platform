@@ -1,4 +1,4 @@
-import type { GitHubContent, GitHubFetchOptions } from './types.js';
+import type { GitHubContent, GitHubFetchOptions, GitHubTreeResponse } from './types.js';
 
 const resolveToken = () => {
   try {
@@ -12,6 +12,9 @@ const resolveToken = () => {
 
 const readmeHtmlCache: Map<string, string> = new Map();
 const readmeRawCache: Map<string, { content: string; sha: string; downloadUrl: string }> = new Map();
+const markdownFileHtmlCache: Map<string, string> = new Map();
+const markdownFileRawCache: Map<string, string> = new Map();
+const repoTreeCache: Map<string, string[]> = new Map();
 
 export class GitHubREADMEFetcher {
   private baseUrl: string;
@@ -20,6 +23,13 @@ export class GitHubREADMEFetcher {
   constructor(options: GitHubFetchOptions = {}) {
     this.baseUrl = options.baseUrl || 'https://api.github.com';
     this.token = options.token ?? resolveToken();
+  }
+
+  private encodeContentPath(path: string): string {
+    return path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
   }
 
   private async fetchWithAuth(url: string): Promise<Response> {
@@ -109,6 +119,85 @@ export class GitHubREADMEFetcher {
     return result;
   }
 
+  async listRepoFiles(repo: string, ref: string = 'main'): Promise<string[]> {
+    const cacheKey = `${repo}@${ref}`;
+    const cached = repoTreeCache.get(cacheKey);
+    if (cached) return cached;
+
+    const url = `${this.baseUrl}/repos/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`;
+    const response = await this.fetchWithAuth(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch git tree for ${repo}@${ref}: ${response.statusText}`);
+    }
+
+    const data: GitHubTreeResponse = await response.json();
+    const files = (data.tree || [])
+      .filter((entry) => entry.type === 'blob')
+      .map((entry) => entry.path);
+
+    repoTreeCache.set(cacheKey, files);
+    return files;
+  }
+
+  async fetchMarkdownFile(repo: string, filePath: string, ref: string = 'main'): Promise<string> {
+    const cacheKey = `${repo}@${ref}:${filePath}`;
+    const cached = markdownFileRawCache.get(cacheKey);
+    if (cached) return cached;
+
+    const encodedPath = this.encodeContentPath(filePath);
+    const url = `${this.baseUrl}/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`;
+    const response = await this.fetchWithAuth(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file ${repo}@${ref}:${filePath}: ${response.statusText}`);
+    }
+
+    const data: GitHubContent = await response.json();
+    if (data.type && data.type !== 'file') {
+      throw new Error(`Expected a file at ${repo}:${filePath}, got ${data.type}`);
+    }
+    if (data.encoding !== 'base64') {
+      throw new Error(`Unexpected encoding for ${filePath}: ${data.encoding}`);
+    }
+
+    const content = Buffer.from(data.content, 'base64').toString('utf-8');
+    markdownFileRawCache.set(cacheKey, content);
+    return content;
+  }
+
+  async renderMarkdownToHtml(markdown: string, repoContext?: string): Promise<string> {
+    const url = `${this.baseUrl}/markdown`;
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'shart-platform-labs'
+    };
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+    const body = JSON.stringify({
+      text: markdown,
+      mode: 'gfm',
+      ...(repoContext ? { context: repoContext } : {})
+    });
+
+    const response = await fetch(url, { method: 'POST', headers, body });
+    if (!response.ok) {
+      throw new Error(`Failed to render markdown HTML: ${response.statusText}`);
+    }
+    return response.text();
+  }
+
+  async fetchMarkdownFileHtml(repo: string, filePath: string, ref: string = 'main'): Promise<string> {
+    const cacheKey = `${repo}@${ref}:${filePath}`;
+    const cached = markdownFileHtmlCache.get(cacheKey);
+    if (cached) return cached;
+
+    const markdown = await this.fetchMarkdownFile(repo, filePath, ref);
+    const html = await this.renderMarkdownToHtml(markdown, repo);
+    markdownFileHtmlCache.set(cacheKey, html);
+    return html;
+  }
+
   async getBranchLastModified(repo: string, branch: string): Promise<string> {
     const url = `${this.baseUrl}/repos/${repo}/branches/${branch}`;
     const response = await this.fetchWithAuth(url);
@@ -138,4 +227,19 @@ export async function fetchREADMEWithMetadata(repo: string, branch?: string, opt
 export async function fetchREADMEHtml(repo: string, branch?: string, options?: GitHubFetchOptions): Promise<string> {
   const fetcher = options ? new GitHubREADMEFetcher(options) : readmeFetcher;
   return fetcher.fetchREADMEHtml(repo, branch);
+}
+
+export async function listRepoFiles(repo: string, ref?: string, options?: GitHubFetchOptions): Promise<string[]> {
+  const fetcher = options ? new GitHubREADMEFetcher(options) : readmeFetcher;
+  return fetcher.listRepoFiles(repo, ref ?? 'main');
+}
+
+export async function fetchMarkdownFile(repo: string, filePath: string, ref?: string, options?: GitHubFetchOptions): Promise<string> {
+  const fetcher = options ? new GitHubREADMEFetcher(options) : readmeFetcher;
+  return fetcher.fetchMarkdownFile(repo, filePath, ref ?? 'main');
+}
+
+export async function fetchMarkdownFileHtml(repo: string, filePath: string, ref?: string, options?: GitHubFetchOptions): Promise<string> {
+  const fetcher = options ? new GitHubREADMEFetcher(options) : readmeFetcher;
+  return fetcher.fetchMarkdownFileHtml(repo, filePath, ref ?? 'main');
 }

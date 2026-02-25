@@ -1,0 +1,73 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+export interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = 'Games', description = 'Interactive cloud security training games' } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <header class="game-header">
+    <div class="game-header__top">
+      <span class="game-header__prompt">[GAME_SYS]</span>
+      <span class="game-header__status">ACTIVE</span>
+    </div>
+    <h1 class="game-header__title">{title}</h1>
+    {description && (
+      <p class="game-header__desc">{description}</p>
+    )}
+  </header>
+
+  <section class="game-content">
+    <slot />
+  </section>
+</BaseLayout>
+
+<style>
+  .game-header {
+    margin-bottom: 2rem;
+  }
+
+  .game-header__top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 0.75rem;
+  }
+
+  .game-header__prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .game-header__status {
+    color: var(--color-primary);
+    animation: breathe 4s ease-in-out infinite;
+  }
+
+  .game-header__title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+    margin: 0 0 0.5rem;
+  }
+
+  .game-header__desc {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+    line-height: 1.6;
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  .game-content {
+    min-height: 400px;
+  }
+</style>

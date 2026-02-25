@@ -1,0 +1,14 @@
+cloudflare_api_token = "replace-me"
+cloudflare_zone_id   = "replace-me"
+safe_rollout         = true
+
+# Optional overrides
+# allowed_hosts      = ["shart.cloud", "www.shart.cloud", "platform.shart.cloud"]
+# auth_sign_in_limit = 10
+# auth_sign_in_period = 60
+# auth_sign_up_limit = 5
+# auth_sign_up_period = 600
+# auth_reset_limit   = 5
+# auth_reset_period  = 600
+# ctf_submit_limit   = 30
+# ctf_submit_period  = 60

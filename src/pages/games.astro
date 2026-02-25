@@ -1,0 +1,350 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DataCard from '../components/ui/DataCard.astro';
+import SectionHeader from '../components/ui/SectionHeader.astro';
+
+const games = await getCollection('games');
+
+const difficultySymbols: Record<string, string> = {
+  beginner: '\u25CF\u25CB\u25CB',
+  intermediate: '\u25CF\u25CF\u25CB',
+  advanced: '\u25CF\u25CF\u25CF',
+};
+---
+
+<BaseLayout
+  title="Games"
+  description="Interactive cloud security training games. Learn Kubernetes, IAM, and more by playing."
+>
+  <div class="games-page">
+    <DataCard as="header" class="games-header" hover={false} style="--card-padding: 1.75rem">
+      <div class="games-header__top">
+        <span class="games-header__prompt">[GAME_SYS]</span>
+        <span class="games-header__status">ONLINE</span>
+      </div>
+      <h1 class="games-header__title">TRAINING_GAMES</h1>
+      <p class="games-header__desc">
+        Learn cloud infrastructure concepts through interactive games.
+        No login required to play — sign in to save your scores.
+      </p>
+      <div class="games-header__stats">
+        <span>{games.length} GAMES AVAILABLE</span>
+      </div>
+    </DataCard>
+
+    <SectionHeader title="Playable Modules" description="Short, interactive exercises for infrastructure and cloud security fundamentals." />
+
+    <section class="games-grid">
+      {games.map((game, index) => (
+        <DataCard as="article" class="game-card" style={`--delay: ${index * 80}ms; --card-padding: 1.5rem`}>
+          <div class="game-card__header">
+            <div class="game-card__meta">
+              <span class="game-card__category">[{game.data.category.toUpperCase()}]</span>
+              <span class="game-card__difficulty" data-level={game.data.difficulty}>
+                {difficultySymbols[game.data.difficulty]}
+              </span>
+            </div>
+            <span class="game-card__levels">{game.data.totalLevels ? `${game.data.totalLevels} LEVELS` : 'ENDLESS'}</span>
+          </div>
+
+          <h2 class="game-card__title">
+            <a href={`/games/${game.slug}`}>{game.data.title}</a>
+          </h2>
+
+          <p class="game-card__desc">{game.data.description}</p>
+
+          <div class="game-card__objectives">
+            <span class="game-card__objectives-label">YOU'LL LEARN:</span>
+            <ul class="game-card__objectives-list">
+              {game.data.learningObjectives.slice(0, 3).map((obj) => (
+                <li>{obj}</li>
+              ))}
+              {game.data.learningObjectives.length > 3 && (
+                <li class="game-card__more">+{game.data.learningObjectives.length - 3} more</li>
+              )}
+            </ul>
+          </div>
+
+          <div class="game-card__footer">
+            <div class="game-card__time">
+              <span class="game-card__time-icon">&#x25F7;</span>
+              ~{game.data.estimatedTime}min
+            </div>
+            <a href={`/games/${game.slug}`} class="game-card__play">
+              PLAY <span class="game-card__arrow">&rarr;</span>
+            </a>
+          </div>
+        </DataCard>
+      ))}
+    </section>
+
+    {games.length === 0 && (
+      <div class="games-empty">
+        <span class="games-empty__icon">&#x25CB;</span>
+        <p>NO GAMES AVAILABLE</p>
+        <p class="games-empty__sub">Check back soon.</p>
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .games-page {
+    display: flex;
+    flex-direction: column;
+    gap: 2.25rem;
+  }
+
+  .games-header {
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 46%),
+      var(--color-bg-elevated);
+  }
+
+  .games-header__top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 1rem;
+  }
+
+  .games-header__prompt {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .games-header__status {
+    color: var(--color-primary);
+    animation: breathe 4s ease-in-out infinite;
+  }
+
+  .games-header__title {
+    font-size: clamp(1.65rem, 2.2vw, 2rem);
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+    margin: 0 0 0.75rem;
+  }
+
+  .games-header__desc {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+    line-height: 1.6;
+    max-width: 60ch;
+    margin: 0 0 1rem;
+  }
+
+  .games-header__stats {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-primary-subtle);
+  }
+
+  .games-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 640px) {
+    .games-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .game-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    animation: card-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(1px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  .game-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .game-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .game-card__category {
+    font-size: 0.5625rem;
+    color: var(--color-primary-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .game-card__difficulty {
+    font-size: 0.5rem;
+    letter-spacing: 2px;
+    color: var(--color-accent);
+  }
+
+  .game-card__difficulty[data-level="beginner"] { color: var(--color-primary); }
+  .game-card__difficulty[data-level="advanced"] { color: var(--color-error); }
+
+  .game-card__levels {
+    font-size: 0.5625rem;
+    color: var(--color-primary-subtle);
+    letter-spacing: 0.1em;
+  }
+
+  .game-card__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 0.5rem;
+  }
+
+  .game-card__title a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .game-card__title a:hover {
+    color: var(--color-primary-bright);
+  }
+
+  .game-card__desc {
+    font-size: 0.8125rem;
+    color: var(--color-primary-muted);
+    line-height: 1.5;
+    margin: 0 0 1rem;
+    flex-grow: 1;
+  }
+
+  .game-card__objectives {
+    margin-bottom: 0.75rem;
+  }
+
+  .game-card__objectives-label {
+    display: block;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 0.375rem;
+  }
+
+  .game-card__objectives-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.6875rem;
+    line-height: 1.5;
+    color: var(--color-primary-subtle);
+  }
+
+  .game-card__objectives-list li {
+    margin-bottom: 0.125rem;
+  }
+
+  .game-card__objectives-list li::before {
+    content: '\2192 ';
+    color: var(--color-border);
+  }
+
+  .game-card__more {
+    color: var(--color-primary-muted);
+    font-style: italic;
+  }
+
+  .game-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary-subtle);
+  }
+
+  .game-card__time {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .game-card__time-icon { font-size: 0.75rem; }
+
+  .game-card__play {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-bg);
+    background: var(--color-primary);
+    border-radius: 2px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .game-card__play:hover {
+    background: var(--color-primary-bright);
+    box-shadow: 0 0 20px -2px color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .game-card__arrow {
+    transition: transform 0.15s;
+  }
+
+  .game-card__play:hover .game-card__arrow {
+    transform: translateX(2px);
+  }
+
+  .games-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--color-primary-subtle);
+  }
+
+  .games-empty__icon {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .games-empty__sub {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+  }
+</style>

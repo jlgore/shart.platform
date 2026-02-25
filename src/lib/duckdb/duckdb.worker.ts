@@ -135,7 +135,7 @@ self.addEventListener('message', async (evt: MessageEvent<WorkerInMsg>) => {
 
       // Verify checksum if tarData was provided
       if (data.tarData && data.expectedSha256) {
-        const digest = await crypto.subtle.digest('SHA-256', buffer!);
+        const digest = await crypto.subtle.digest('SHA-256', buffer! as BufferSource);
         const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
         if (hex !== data.expectedSha256) {
           post({ type: 'error', message: `SHA-256 mismatch. expected=${data.expectedSha256} got=${hex}` });

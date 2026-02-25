@@ -10,3 +10,20 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Cloudflare runtime bindings
+type D1Database = import('@cloudflare/workers-types').D1Database;
+
+interface CloudflareEnv {
+  DB: D1Database;
+  BETTER_AUTH_SECRET: string;
+  API_BASE_URL?: string;
+}
+
+type Runtime = import('@astrojs/cloudflare').Runtime<CloudflareEnv>;
+
+declare namespace App {
+  interface Locals extends Runtime {
+    user: import('./lib/auth').SessionUser | null;
+  }
+}

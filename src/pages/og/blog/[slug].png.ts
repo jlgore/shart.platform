@@ -40,7 +40,7 @@ export const GET: APIRoute = async ({ params }) => {
     );
   }
 
-  return new Response(png, {
+  return new Response(png as unknown as BodyInit, {
     status: 200,
     headers: {
       'content-type': 'image/png',

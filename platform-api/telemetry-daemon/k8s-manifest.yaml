@@ -1,0 +1,98 @@
+---
+# DaemonSet to run telemetry on all nodes
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: shart-telemetry
+  namespace: kube-system
+  labels:
+    app: shart-telemetry
+spec:
+  selector:
+    matchLabels:
+      app: shart-telemetry
+  template:
+    metadata:
+      labels:
+        app: shart-telemetry
+    spec:
+      serviceAccountName: shart-telemetry
+      containers:
+      - name: telemetry
+        image: ghcr.io/shart-cloud/shart-telemetry:latest
+        imagePullPolicy: Always
+        env:
+        - name: INSTANCE_ID
+          valueFrom:
+            secretKeyRef:
+              name: shart-telemetry
+              key: INSTANCE_ID
+        - name: INSTANCE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shart-telemetry
+              key: INSTANCE_SECRET
+        - name: API_URL
+          valueFrom:
+            secretKeyRef:
+              name: shart-telemetry
+              key: API_URL
+              optional: true
+        volumeMounts:
+        # Mount host filesystem to watch honeytokens
+        - name: host-etc
+          mountPath: /etc/kubernetes
+          readOnly: true
+        - name: host-var
+          mountPath: /var/lib/shart
+          readOnly: true
+        - name: host-opt
+          mountPath: /opt/shart
+          readOnly: true
+        - name: host-tmp
+          mountPath: /tmp
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+      volumes:
+      - name: host-etc
+        hostPath:
+          path: /etc/kubernetes
+          type: DirectoryOrCreate
+      - name: host-var
+        hostPath:
+          path: /var/lib/shart
+          type: DirectoryOrCreate
+      - name: host-opt
+        hostPath:
+          path: /opt/shart
+          type: DirectoryOrCreate
+      - name: host-tmp
+        hostPath:
+          path: /tmp
+          type: Directory
+      tolerations:
+      # Run on all nodes including control plane
+      - operator: Exists
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shart-telemetry
+  namespace: kube-system
+---
+# Players create this secret when they register
+# kubectl create secret generic shart-telemetry \
+#   --from-literal=INSTANCE_ID=<uuid> \
+#   --from-literal=INSTANCE_SECRET=<secret> \
+#   --from-literal=API_URL=https://platform.shart.cloud/api/ctf/telemetry \
+#   -n kube-system

@@ -1,0 +1,221 @@
+---
+/**
+ * Theme Switcher Component
+ * Allows users to choose between Phosphor, Amber, and Sage color themes.
+ * Persists choice to localStorage.
+ */
+---
+
+<div class="theme-switcher">
+  <button
+    type="button"
+    class="theme-toggle"
+    aria-label="Change color theme"
+    aria-haspopup="true"
+    aria-expanded="false"
+  >
+    <span class="theme-icon" aria-hidden="true"></span>
+    <span class="sr-only">Theme</span>
+  </button>
+
+  <div class="theme-menu" role="menu" aria-label="Color themes">
+    <button
+      type="button"
+      role="menuitem"
+      data-theme-option="amber"
+      class="theme-option"
+    >
+      <span class="theme-swatch theme-swatch-amber" aria-hidden="true"></span>
+      <span>Amber</span>
+    </button>
+    <button
+      type="button"
+      role="menuitem"
+      data-theme-option="sage"
+      class="theme-option"
+    >
+      <span class="theme-swatch theme-swatch-sage" aria-hidden="true"></span>
+      <span>Sage</span>
+    </button>
+  </div>
+</div>
+
+<style>
+  .theme-switcher {
+    position: relative;
+  }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .theme-toggle:hover {
+    border-color: var(--color-primary);
+  }
+
+  .theme-icon {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: conic-gradient(
+      #d4b896 0deg 180deg,
+      #a8c8a8 180deg 360deg
+    );
+  }
+
+  .theme-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    display: none;
+    flex-direction: column;
+    min-width: 8rem;
+    padding: 0.5rem;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    z-index: 50;
+  }
+
+  .theme-switcher.open .theme-menu {
+    display: flex;
+  }
+
+  .theme-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    color: var(--color-primary-muted);
+    font-size: 0.875rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .theme-option:hover {
+    background: var(--color-border);
+    color: var(--color-primary);
+  }
+
+  .theme-option[data-active="true"] {
+    color: var(--color-primary);
+  }
+
+  .theme-swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .theme-swatch-amber {
+    background: #d4b896;
+  }
+
+  .theme-swatch-sage {
+    background: #a8c8a8;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+
+<script>
+  // Theme switcher functionality
+  function initThemeSwitcher() {
+    const switcher = document.querySelector('.theme-switcher');
+    const toggle = document.querySelector('.theme-toggle');
+    const menu = document.querySelector('.theme-menu');
+    const options = document.querySelectorAll('.theme-option');
+
+    if (!switcher || !toggle || !menu) return;
+
+    // Get saved theme or default to amber
+    const saved = localStorage.getItem('theme');
+    const savedTheme = (saved === 'amber' || saved === 'sage') ? saved : 'amber';
+    applyTheme(savedTheme);
+
+    // Toggle menu
+    toggle.addEventListener('click', () => {
+      const isOpen = switcher.classList.contains('open');
+      switcher.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    // Handle option clicks
+    options.forEach((option) => {
+      option.addEventListener('click', () => {
+        const theme = option.getAttribute('data-theme-option');
+        if (theme) {
+          applyTheme(theme);
+          localStorage.setItem('theme', theme);
+          switcher.classList.remove('open');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!switcher.contains(e.target as Node)) {
+        switcher.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Close on escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && switcher.classList.contains('open')) {
+        switcher.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+        (toggle as HTMLElement).focus();
+      }
+    });
+
+    function applyTheme(theme: string) {
+      // Remove existing theme
+      document.documentElement.removeAttribute('data-theme');
+
+      // Apply new theme (amber is default, no attribute needed)
+      if (theme !== 'amber') {
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+
+      // Update active states
+      options.forEach((opt) => {
+        const isActive = opt.getAttribute('data-theme-option') === theme;
+        opt.setAttribute('data-active', String(isActive));
+      });
+    }
+  }
+
+  // Initialize on load
+  initThemeSwitcher();
+
+  // Re-initialize on Astro page transitions
+  document.addEventListener('astro:after-swap', initThemeSwitcher);
+</script>

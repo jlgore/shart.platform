@@ -1,0 +1,80 @@
+name = "shart-labs-worker"
+main = "src/index.ts"
+account_id = "11caecd272df7dbdcc636034c25b1f1c"
+compatibility_date = "2026-02-20"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "labs.shart.cloud/*", zone_name = "shart.cloud" }
+]
+
+# KV for hot session state
+# Run: wrangler kv namespace create SESSIONS
+# Then replace the id below
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "628958ca42404a4cbdf3006d8bbc1547"
+
+# D1 (shared with platform-api — auth sessions + lab tables)
+[[d1_databases]]
+binding = "DB"
+database_name = "shart-ctf-db"
+database_id = "786fbd4c-fefe-49ba-b64f-0d345d8bac1b"
+
+# Durable Object bindings
+[[durable_objects.bindings]]
+name = "LAB_CONTAINER"
+class_name = "LabContainer"
+
+# DO migrations — must be bumped when adding new DO classes
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LabContainer"]
+
+# Container config — requires Workers Paid plan
+[[containers]]
+class_name = "LabContainer"
+image = "./Dockerfile"
+max_instances = 15
+
+[vars]
+ENVIRONMENT = "production"
+# Set via wrangler secret:
+# wrangler secret put COMPLETION_WEBHOOK_SECRET
+# wrangler secret put PLATFORM_API_URL
+
+[observability]
+enabled = true
+
+# ============================================================================
+# Development
+# ============================================================================
+[env.dev]
+name = "shart-labs-worker-dev"
+
+# Run: wrangler kv namespace create SESSIONS --env dev
+[[env.dev.kv_namespaces]]
+binding = "SESSIONS"
+id = "4a601d58be404abb8b05052db8251092"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "shart-ctf-db-dev"
+database_id = "5b4238d6-1fdb-4716-bea7-29d3278f5b40"
+
+[[env.dev.durable_objects.bindings]]
+name = "LAB_CONTAINER"
+class_name = "LabContainer"
+
+# DO migrations for dev — mirrors the top-level [[migrations]] block
+[[env.dev.migrations]]
+tag = "v1"
+new_sqlite_classes = ["LabContainer"]
+
+[[env.dev.containers]]
+class_name = "LabContainer"
+image = "./Dockerfile"
+max_instances = 3
+
+[env.dev.vars]
+ENVIRONMENT = "development"

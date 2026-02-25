@@ -17,6 +17,100 @@ const id = `lazy-activity-${Math.random().toString(36).substr(2, 9)}`;
 </section>
 
 <script define:vars={{ id, limit, include }}>
+  const formatTypeLabel = (type) => {
+    if (type === 'lab') return '[Lab]';
+    if (type === 'ctf') return '[CTF]';
+    return '[Blog]';
+  };
+
+  const getSafeHref = (value) => {
+    const href = String(value || '/').trim();
+    if (href.startsWith('/')) {
+      return href.startsWith('//') ? '/' : href;
+    }
+
+    try {
+      const parsed = new URL(href);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.toString();
+      }
+    } catch {
+      return '/';
+    }
+
+    return '/';
+  };
+
+  const renderActivity = (placeholder, activities) => {
+    if (!placeholder) return;
+    placeholder.textContent = '';
+
+    if (!Array.isArray(activities) || activities.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm opacity-80';
+      empty.textContent = 'No recent activity yet.';
+      placeholder.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'space-y-2';
+
+    activities.forEach((item) => {
+      const row = document.createElement('li');
+      row.className = 'flex items-center justify-between';
+
+      const link = document.createElement('a');
+      link.className = 'hover:text-theme-bright';
+      link.href = getSafeHref(item?.href);
+      if (item?.external === true) {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      }
+      const suffix = item?.external === true ? ' ↗' : '';
+      link.textContent = `${formatTypeLabel(item?.type)} ${String(item?.title || '')}${suffix}`;
+
+      const date = document.createElement('span');
+      date.className = 'text-xs text-theme-subtle';
+      date.textContent = new Date(item?.date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC'
+      });
+
+      row.appendChild(link);
+      row.appendChild(date);
+      list.appendChild(row);
+    });
+
+    const links = document.createElement('p');
+    links.className = 'mt-4 text-sm flex gap-4';
+
+    const blogLink = document.createElement('a');
+    blogLink.className = 'hover:text-theme-bright';
+    blogLink.href = '/blog';
+    blogLink.textContent = 'View all posts →';
+    links.appendChild(blogLink);
+
+    const labLink = document.createElement('a');
+    labLink.className = 'hover:text-theme-bright';
+    labLink.href = '/labs';
+    labLink.textContent = 'View all labs →';
+    links.appendChild(labLink);
+
+    if (include.includes('ctf')) {
+      const ctfLink = document.createElement('a');
+      ctfLink.className = 'hover:text-theme-bright';
+      ctfLink.href = '/ctf';
+      ctfLink.textContent = 'View all CTFs →';
+      links.appendChild(ctfLink);
+    }
+
+    placeholder.appendChild(list);
+    placeholder.appendChild(links);
+  };
+
   // Lazy load activity data when component becomes visible
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(async (entry) => {
@@ -29,39 +123,17 @@ const id = `lazy-activity-${Math.random().toString(36).substr(2, 9)}`;
 
           const placeholder = entry.target.querySelector('.activity-placeholder');
           if (placeholder && data.activities) {
-            placeholder.innerHTML = data.activities.length === 0
-              ? '<p class="text-sm opacity-80">No recent activity yet.</p>'
-              : `
-                <ul class="space-y-2">
-                  ${data.activities.map(item => `
-                    <li class="flex items-center justify-between">
-                      <a class="hover:text-term-green-dark" href="${item.href}"${item.external ? ' target="_blank" rel="noopener noreferrer"' : ''}>
-                        ${item.type === 'lab' ? '[Lab] ' : item.type === 'ctf' ? '[CTF] ' : '[Blog] '} ${item.title}
-                        ${item.external ? ' ↗' : ''}
-                      </a>
-                      <span class="text-xs text-term-green/70">
-                        ${new Date(item.date).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                          timeZone: 'UTC'
-                        })}
-                      </span>
-                    </li>
-                  `).join('')}
-                </ul>
-                <p class="mt-4 text-sm flex gap-4">
-                  <a class="hover:text-term-green-dark" href="/blog">View all posts →</a>
-                  <a class="hover:text-term-green-dark" href="/labs">View all labs →</a>
-                  ${include.includes('ctf') ? '<a class="hover:text-term-green-dark" href="/ctf">View all CTFs →</a>' : ''}
-                </p>
-              `;
+            renderActivity(placeholder, data.activities);
           }
         } catch (error) {
           console.error('Failed to load latest activity:', error);
           const placeholder = entry.target.querySelector('.activity-placeholder');
           if (placeholder) {
-            placeholder.innerHTML = '<p class="text-sm opacity-80 text-red-400">Failed to load activity.</p>';
+            placeholder.textContent = '';
+            const errorEl = document.createElement('p');
+            errorEl.className = 'text-sm opacity-80 text-red-400';
+            errorEl.textContent = 'Failed to load activity.';
+            placeholder.appendChild(errorEl);
           }
         }
       }

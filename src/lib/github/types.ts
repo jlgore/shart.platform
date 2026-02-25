@@ -8,10 +8,26 @@ export interface GitHubBranch {
 }
 
 export interface GitHubContent {
+  type?: string;
   content: string;
   sha: string;
   encoding: string;
   download_url: string;
+}
+
+export interface GitHubTreeEntry {
+  path: string;
+  mode: string;
+  type: 'blob' | 'tree' | 'commit';
+  sha: string;
+  size?: number;
+  url: string;
+}
+
+export interface GitHubTreeResponse {
+  sha: string;
+  truncated: boolean;
+  tree: GitHubTreeEntry[];
 }
 
 export interface BranchStep {

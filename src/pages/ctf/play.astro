@@ -1,0 +1,547 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { requireAuth } from '../../lib/auth-helpers';
+import { getQuestions, getStatus, ApiError, type Question } from '../../lib/api-client';
+
+const sessionToken = requireAuth(Astro);
+const user = Astro.locals.user!;
+const apiBase = Astro.locals.runtime?.env?.API_BASE_URL;
+
+const ctfSlug = Astro.url.searchParams.get('ctf') || 'shart-cloud';
+
+let questions: Question[] = [];
+let status = null;
+let error = null;
+
+try {
+  [questions, status] = await Promise.all([
+    getQuestions(ctfSlug, sessionToken, apiBase),
+    getStatus(ctfSlug, sessionToken, apiBase).catch(() => null),
+  ]);
+} catch (e) {
+  if (e instanceof ApiError) {
+    error = e.message;
+  } else {
+    error = 'Failed to load questions';
+  }
+}
+
+// Group questions by phase
+const phases = questions.reduce((acc, q) => {
+  const key = `${q.phase_number}-${q.phase_name}`;
+  if (!acc.has(key)) {
+    acc.set(key, { phase_number: q.phase_number, phase_name: q.phase_name, questions: [] });
+  }
+  acc.get(key)!.questions.push(q);
+  return acc;
+}, new Map<string, { phase_number: number; phase_name: string; questions: Question[] }>());
+
+const sortedPhases = Array.from(phases.values()).sort((a, b) => a.phase_number - b.phase_number);
+---
+
+<BaseLayout title="CTF Play">
+  <header class="mb-8">
+    <div class="terminal-header">
+      <span class="text-xs" style="color: var(--color-primary-muted);">ACCESS: AUTHENTICATED</span>
+      <span class="text-xs" style="color: var(--color-primary-subtle);">CTF: {ctfSlug.toUpperCase()}</span>
+    </div>
+    <div class="header-row">
+      <div>
+        <h1 class="text-2xl font-bold uppercase" style="color: var(--color-primary);">CTF Challenges</h1>
+        <p class="text-sm mt-2" style="color: var(--color-primary-muted);">Answer questions to earn points</p>
+      </div>
+      {status && (
+        <div class="status-summary">
+          <span class="points-display">{status.total_points} pts</span>
+          <span class="progress-display">{status.questions_answered}/{status.questions_total} solved</span>
+        </div>
+      )}
+    </div>
+    <nav class="play-nav">
+      <a href={`/ctf/dashboard?ctf=${ctfSlug}`}>Dashboard</a>
+    </nav>
+  </header>
+
+  {error ? (
+    <div class="terminal-window">
+      <p style="color: var(--color-error);">[ERROR] {error}</p>
+    </div>
+  ) : (
+    <div class="phases-container">
+      {sortedPhases.map((phase) => (
+        <section class="phase-section">
+          <h2 class="phase-title">
+            <span class="phase-number">Phase {phase.phase_number}</span>
+            <span class="phase-name">{phase.phase_name}</span>
+          </h2>
+
+          <div class="questions-list">
+            {phase.questions.map((q) => (
+              <article
+                class={`question-card ${q.is_answered ? 'question-answered' : ''}`}
+                data-question-id={q.id}
+              >
+                <div class="question-header">
+                  <span class="question-number">Q{q.question_number}</span>
+                  <span class="question-points">
+                    {q.is_answered ? (
+                      <span class="points-earned">+{q.points_awarded} pts</span>
+                    ) : (
+                      <span>{q.base_points} pts</span>
+                    )}
+                  </span>
+                </div>
+
+                <p class="question-text">{q.question_text}</p>
+
+                {!q.is_answered && (
+                  <>
+                    <!-- Hints -->
+                    {q.hints.length > 0 && (
+                      <div class="hints-section">
+                        <h4 class="hints-title">Hints</h4>
+                        <ul class="hints-list">
+                          {q.hints.map((hint, idx) => (
+                            <li class="hint-item" data-hint-index={idx}>
+                              {hint.unlocked ? (
+                                <span class="hint-text">{hint.text}</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  class="hint-unlock-btn"
+                                  data-question-id={q.id}
+                                  data-hint-index={idx}
+                                  data-hint-cost={hint.cost}
+                                  disabled={idx > 0 && !q.hints[idx - 1].unlocked}
+                                >
+                                  Unlock Hint {idx + 1} (-{hint.cost} pts)
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <!-- Answer form -->
+                    <form class="answer-form" data-question-id={q.id}>
+                      <input
+                        type="text"
+                        name="answer"
+                        placeholder="Enter your answer..."
+                        class="answer-input"
+                        autocomplete="off"
+                      />
+                      <button type="submit" class="submit-btn">Submit</button>
+                    </form>
+                  </>
+                )}
+
+                {q.is_answered && (
+                  <div class="answered-badge">
+                    <span>&#10003; Solved</span>
+                  </div>
+                )}
+
+                <!-- Feedback area -->
+                <div class="feedback-area" data-feedback-for={q.id}></div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )}
+</BaseLayout>
+
+<script define:vars={{ apiBase }}>
+  // API base URL
+  const API_BASE = apiBase || (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? `${window.location.protocol}//${window.location.hostname}:8787`
+      : window.location.origin
+  );
+
+  const setFeedback = (feedbackEl, tone, message) => {
+    if (!feedbackEl) return;
+    feedbackEl.textContent = '';
+    const box = document.createElement('div');
+    box.className = `feedback ${tone}`;
+    box.textContent = message;
+    feedbackEl.appendChild(box);
+  };
+
+  // Submit answer handler
+  document.querySelectorAll('.answer-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const questionId = form.dataset.questionId;
+      const input = form.querySelector('input[name="answer"]');
+      const answer = input.value.trim();
+      const feedbackEl = document.querySelector(`[data-feedback-for="${questionId}"]`);
+      const submitBtn = form.querySelector('button[type="submit"]');
+
+      if (!answer) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Checking...';
+      feedbackEl.textContent = '';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/ctf/questions/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ question_id: questionId, answer }),
+        });
+
+        const data = await res.json();
+
+        if (data.correct) {
+          const awarded = Number(data.points_awarded || 0);
+          setFeedback(feedbackEl, 'success', `Correct! +${awarded} points`);
+          // Mark card as answered
+          const card = document.querySelector(`[data-question-id="${questionId}"]`);
+          card.classList.add('question-answered');
+          // Hide form and hints
+          form.style.display = 'none';
+          const hints = card.querySelector('.hints-section');
+          if (hints) hints.style.display = 'none';
+          // Add solved badge
+          const badge = document.createElement('div');
+          badge.className = 'answered-badge';
+          const badgeText = document.createElement('span');
+          badgeText.textContent = '✓ Solved';
+          badge.appendChild(badgeText);
+          card.appendChild(badge);
+          // Update points in header
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          setFeedback(feedbackEl, 'error', 'Incorrect. Try again!');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+        }
+      } catch (err) {
+        setFeedback(feedbackEl, 'error', 'Error submitting answer');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+      }
+    });
+  });
+
+  // Unlock hint handler
+  document.querySelectorAll('.hint-unlock-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const questionId = btn.dataset.questionId;
+      const hintIndex = parseInt(btn.dataset.hintIndex, 10);
+      const feedbackEl = document.querySelector(`[data-feedback-for="${questionId}"]`);
+
+      btn.disabled = true;
+      btn.textContent = 'Unlocking...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/ctf/questions/hint`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ question_id: questionId, hint_index: hintIndex }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // Replace button with hint text
+          const hintItem = btn.closest('.hint-item');
+          if (hintItem) {
+            hintItem.textContent = '';
+            const hintText = document.createElement('span');
+            hintText.className = 'hint-text';
+            hintText.textContent = String(data.hint?.text ?? '');
+            hintItem.appendChild(hintText);
+          }
+          // Enable next hint button if exists
+          const nextBtn = document.querySelector(
+            `.hint-unlock-btn[data-question-id="${questionId}"][data-hint-index="${hintIndex + 1}"]`
+          );
+          if (nextBtn) nextBtn.disabled = false;
+        } else {
+          setFeedback(feedbackEl, 'error', String(data.error || 'Failed to unlock hint'));
+          btn.disabled = false;
+          btn.textContent = `Unlock Hint ${hintIndex + 1} (-${btn.dataset.hintCost} pts)`;
+        }
+      } catch (err) {
+        setFeedback(feedbackEl, 'error', 'Error unlocking hint');
+        btn.disabled = false;
+        btn.textContent = `Unlock Hint ${hintIndex + 1} (-${btn.dataset.hintCost} pts)`;
+      }
+    });
+  });
+</script>
+
+<style>
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .status-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+  }
+
+  .points-display {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  .progress-display {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  .play-nav {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .play-nav a {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  /* Phases */
+  .phases-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .phase-section {
+    padding: 1.5rem;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+  }
+
+  .phase-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 0 0 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .phase-number {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    letter-spacing: 0.05em;
+  }
+
+  .phase-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  /* Questions */
+  .questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .question-card {
+    padding: 1rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    transition: border-color 0.15s;
+  }
+
+  .question-card:hover {
+    border-color: var(--color-primary-subtle);
+  }
+
+  .question-answered {
+    border-color: var(--color-primary);
+    opacity: 0.7;
+  }
+
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .question-number {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-primary-subtle);
+  }
+
+  .question-points {
+    font-size: 0.875rem;
+    color: var(--color-primary-muted);
+  }
+
+  .points-earned {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .question-text {
+    margin: 0 0 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--color-primary);
+  }
+
+  /* Hints */
+  .hints-section {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: var(--color-bg-elevated);
+    border-radius: 0.25rem;
+  }
+
+  .hints-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-primary-subtle);
+    margin: 0 0 0.5rem;
+  }
+
+  .hints-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .hint-text {
+    font-size: 0.875rem;
+    color: var(--color-accent);
+    font-style: italic;
+  }
+
+  .hint-unlock-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    color: var(--color-primary-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .hint-unlock-btn:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .hint-unlock-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Answer form */
+  .answer-form {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .answer-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    color: var(--color-primary);
+  }
+
+  .answer-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .answer-input::placeholder {
+    color: var(--color-primary-subtle);
+  }
+
+  .submit-btn {
+    padding: 0.5rem 1rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: var(--color-primary);
+    border: none;
+    border-radius: 0.25rem;
+    color: var(--color-bg);
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .submit-btn:hover:not(:disabled) {
+    background-color: var(--color-primary-bright);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Answered badge */
+  .answered-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  /* Feedback */
+  .feedback-area {
+    margin-top: 0.5rem;
+  }
+
+  .feedback {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .feedback.success {
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+  }
+
+  .feedback.error {
+    background-color: color-mix(in srgb, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+  }
+</style>

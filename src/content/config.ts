@@ -2,7 +2,7 @@ import { defineCollection, z } from 'astro:content';
 
 const blogCollection = defineCollection({
   type: 'content',
-  schema: z
+  schema: ({ image }) => z
     .object({
       title: z.string(),
       description: z.string(),
@@ -12,7 +12,8 @@ const blogCollection = defineCollection({
       tags: z.array(z.string()),
       difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
       readTime: z.number(),
-      image: z.string().optional(),
+      // Use Astro's image() helper for optimized images from src/assets
+      image: image().optional(),
       draft: z.boolean().default(false),
 
       // Linked-list style external posts
@@ -119,11 +120,45 @@ const labsCollection = defineCollection({
   }),
 });
 
+// Games collection for interactive training games
+const gamesCollection = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    gameId: z.string(),
+    category: z.enum(['kubernetes', 'cloud-security', 'iam', 'general']),
+    difficulty: z.enum(['beginner', 'intermediate', 'advanced']),
+    totalLevels: z.number().optional(),
+    estimatedTime: z.number(), // minutes
+    learningObjectives: z.array(z.string()),
+  }),
+});
+
+const coursesCollection = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    difficulty: z.enum(['beginner', 'intermediate', 'advanced']).default('intermediate'),
+    tags: z.array(z.string()).default([]),
+    githubRepo: z.string(), // e.g., 'shart-cloud/container-course'
+    defaultRef: z.string().default('main'),
+    weekPattern: z.string().default('^week-\d+/README\.md$'),
+    labPattern: z.string().default('^week-\d+/labs/[^/]+/README\.md$'),
+    isActive: z.boolean().default(true),
+    draft: z.boolean().default(false),
+    publishedDate: z.coerce.date(),
+  }),
+});
+
 export const collections = {
   blog: blogCollection,
   bios: biosCollection,
   ctf: ctfCollection,
   labs: labsCollection,
+  games: gamesCollection,
+  courses: coursesCollection,
   // Speaking engagements, conferences, streams, etc.
   events: defineCollection({
     type: 'content',

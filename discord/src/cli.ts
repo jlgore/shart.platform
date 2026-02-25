@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
 import { loadConfig } from './config.js';
 import { syncGuild } from './sync.js';
 import { buildInviteUrl } from './invite.js';
@@ -8,13 +9,14 @@ import { resolvePermissions } from './permissions.js';
 function usage() {
   console.log(
     `Usage:
-  DISCORD_TOKEN=... GUILD_ID=... npm run sync -- --config config/guild.yaml [--dry]
-  DISCORD_TOKEN=... GUILD_ID=... npm run validate -- --config config/guild.yaml
+  DISCORD_TOKEN=... GUILD_ID=... npm run sync -- --config config/guild.yaml [--dry] [--strict]
+  DISCORD_TOKEN=... GUILD_ID=... npm run validate -- --config config/guild.yaml [--strict]
   npm run invite [-- --permissions Administrator,ManageChannels] [--scopes bot,applications.commands]
 
 Flags:
   --config, -c   Path to YAML config file
   --dry          Dry-run (log actions without making changes)
+  --strict       Extra validation (duplicate names across parents, etc.)
   invite flags:
   --permissions, -p  Permission names (comma list) or integer bitfield (default: Administrator)
   --scopes, -s       Scopes (comma list). Default: bot,applications.commands
@@ -23,10 +25,11 @@ Flags:
 }
 
 function parseArgs(argv: string[]) {
-  const args = { command: '', config: '', dry: false, permissions: '', scopes: '' } as {
+  const args = { command: '', config: '', dry: false, strict: false, permissions: '', scopes: '' } as {
     command: 'sync' | 'validate' | 'invite' | '';
     config: string;
     dry: boolean;
+    strict: boolean;
     permissions: string;
     scopes: string;
   };
@@ -35,6 +38,7 @@ function parseArgs(argv: string[]) {
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry') args.dry = true;
+    else if (a === '--strict') args.strict = true;
     else if (a === '--config' || a === '-c') {
       args.config = rest[++i];
     } else if (a === '--permissions' || a === '-p') {
@@ -86,7 +90,7 @@ async function main() {
       return;
     }
 
-    const cfg = await loadConfig(args.config);
+    const cfg = await loadConfig(args.config, { strict: args.strict });
     if (args.command === 'validate') {
       console.log('Config OK');
       process.exit(0);
