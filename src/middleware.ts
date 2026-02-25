@@ -30,7 +30,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   }
   const workerSrc = ["'self'"]; // vendored workers loaded from same or CDN origin
   const styleSrc = ["'self'", "'unsafe-inline'"]; // keep inline styles for now
-  const imgSrc = ["'self'", 'data:', 'blob:'];
+  const imgSrc = ["'self'", 'data:', 'blob:', 'https://media.githubusercontent.com', 'https://raw.githubusercontent.com', 'https://github.com'];
   const fontSrc = ["'self'", 'data:'];
   const connectSrc = ["'self'", ...connectOrigins];
   if (duckdbOrigin) {
