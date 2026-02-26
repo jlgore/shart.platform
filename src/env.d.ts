@@ -18,6 +18,7 @@ interface CloudflareEnv {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   API_BASE_URL?: string;
+  ENVIRONMENT?: string;
 }
 
 type Runtime = import('@astrojs/cloudflare').Runtime<CloudflareEnv>;

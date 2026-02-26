@@ -19,8 +19,15 @@ export interface AuthSession {
 }
 
 // Create auth instance - must be called with runtime env
-export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string }) {
-  const isProd = import.meta.env.PROD;
+export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string; ENVIRONMENT?: string }) {
+  const runtimeEnv = env.ENVIRONMENT?.toLowerCase();
+  const isProd = runtimeEnv ? runtimeEnv === 'production' : import.meta.env.PROD;
+  const isDevDeploy = runtimeEnv === 'development';
+  const baseURL = isProd
+    ? 'https://shart.cloud'
+    : isDevDeploy
+      ? 'https://dev.shart.cloud'
+      : 'http://localhost:8788';
 
   // Create Kysely instance with D1 dialect
   const db = new Kysely<any>({
@@ -52,11 +59,12 @@ export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string }) 
     verification: {
       modelName: 'verifications',
     },
-    baseURL: isProd ? 'https://shart.cloud' : 'http://localhost:8788',
+    baseURL,
     trustedOrigins: [
       'https://shart.cloud',
       'https://www.shart.cloud',
       'https://platform.shart.cloud',
+      ...(isProd ? [] : ['https://dev.shart.cloud']),
       ...(isProd
         ? []
         : [

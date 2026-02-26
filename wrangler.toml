@@ -20,6 +20,9 @@ main = "./dist/_worker.js/index.js"
 compatibility_date = "2025-03-25"
 compatibility_flags = [ "nodejs_compat" ]
 
+[env.prod.vars]
+ENVIRONMENT = "production"
+
 routes = [
   { pattern = "shart.cloud/*", zone_name = "shart.cloud" },
   { pattern = "www.shart.cloud/*", zone_name = "shart.cloud" }
@@ -38,6 +41,9 @@ name = "shart-platform-dev"
 main = "./dist/_worker.js/index.js"
 compatibility_date = "2025-03-25"
 compatibility_flags = [ "nodejs_compat" ]
+
+[env.dev.vars]
+ENVIRONMENT = "development"
 
 [[env.dev.routes]]
 pattern = "dev.shart.cloud"
