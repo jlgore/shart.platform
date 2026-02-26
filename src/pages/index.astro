@@ -28,13 +28,13 @@ const [nextEvent] = await getUpcomingEvents(1);
     </div>
   </DataCard>
 
-  <section class="home-section home-section-live">
-    <SectionHeader
-      title="Live Signal"
-      description="Latest event where the team is speaking, streaming, or shipping chaos."
-    />
+  {nextEvent && (
+    <section class="home-section home-section-live">
+      <SectionHeader
+        title="Live Signal"
+        description="Latest event where the team is speaking, streaming, or shipping chaos."
+      />
 
-    {nextEvent ? (
       <DataCard as="article" class="live-card" style="--card-padding: 1.5rem 1.25rem">
         <p class="live-card__meta">{formatEventDateRange(nextEvent.data.startDate, nextEvent.data.endDate)}</p>
         <h3 class="live-card__title">
@@ -42,14 +42,8 @@ const [nextEvent] = await getUpcomingEvents(1);
         </h3>
         {nextEvent.data.description && <p class="live-card__desc">{nextEvent.data.description}</p>}
       </DataCard>
-    ) : (
-      <DataCard as="article" class="live-card" hover={false} style="--card-padding: 1.5rem 1.25rem">
-        <p class="live-card__meta">No upcoming events</p>
-        <h3 class="live-card__title">Quiet on the wire (for now)</h3>
-        <p class="live-card__desc">Check back soon, or browse the event archive for past talks and streams.</p>
-      </DataCard>
-    )}
-  </section>
+    </section>
+  )}
 
   <section class="home-section home-section-drops">
     <SectionHeader

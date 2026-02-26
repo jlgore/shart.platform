@@ -1,16 +1,30 @@
 import type { APIRoute } from 'astro';
-import { buildOgSvg } from '../../lib/og/buildOgImage';
+import { buildOgSvg, hostnameFromSite } from '../../lib/og/buildOgImage';
 import path from 'node:path';
 import { getResvg, getFontOptions } from '../../lib/og/resvg';
 
 export const prerender = true;
 
 export const GET: APIRoute = async () => {
-  const svg = await buildOgSvg({
-    title: 'SHART.CLOUD',
-    description: 'Cloud Security, But Weird - Blog, CTFs, labs and irreverent training',
-    templatePath: path.join(process.cwd(), 'public', 'og-blank.svg'),
-  });
+  const templatePath = path.join(process.cwd(), 'public', 'og-win95-base.svg');
+  const siteHostname = hostnameFromSite(import.meta.env.SITE ?? 'shart.platform');
+
+  const svg = await buildOgSvg(
+    {
+      title: 'SHART.PLATFORM',
+      description: 'Cloud security training — Courses, Labs, CTFs, Games',
+      bullets: [
+        'Hands-on labs in real AWS & Kubernetes environments',
+        'CTF challenges that teach by breaking things',
+        'Games that make scheduling and RBAC click',
+      ],
+      category: 'SHART',
+      label: 'Cloud Security Training',
+      siteHostname,
+      windowTitle: `${siteHostname} // Training Terminal`,
+    },
+    templatePath
+  );
 
   try {
     const Resvg = await getResvg();
@@ -24,9 +38,9 @@ export const GET: APIRoute = async () => {
       },
     });
   } catch (err) {
-    return new Response(
-      `@resvg/resvg-wasm not available or failed to run.\n${String(err)}`,
-      { status: 500, headers: { 'content-type': 'text/plain' } }
-    );
+    return new Response(`OG render failed.\n${String(err)}`, {
+      status: 500,
+      headers: { 'content-type': 'text/plain' },
+    });
   }
 };
