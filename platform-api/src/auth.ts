@@ -42,7 +42,7 @@ export function createAuth(env: Env) {
   });
 
   const isProd = env.ENVIRONMENT === 'production';
-  const emailFrom = env.AUTH_FROM_EMAIL || 'SHART Cloud <onboarding@resend.dev>';
+  const emailFrom = env.AUTH_FROM_EMAIL || 'SHART Cloud <onboarding@mx.shart.cloud>';
   const trustedOrigins = [
     'https://shart.cloud',
     'https://www.shart.cloud',

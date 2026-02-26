@@ -40,7 +40,7 @@ export function createAuth(env: {
     dialect: new D1Dialect({ database: env.DB }),
   });
 
-  const emailFrom = env.AUTH_FROM_EMAIL || 'SHART Cloud <onboarding@resend.dev>';
+  const emailFrom = env.AUTH_FROM_EMAIL || 'SHART Cloud <onboarding@mx.shart.cloud>';
 
   const sendVerificationEmail = async ({ user, url }: { user: { email: string; name?: string | null }; url: string }) => {
     if (!env.RESEND_API_KEY) {
