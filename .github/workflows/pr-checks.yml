@@ -2,7 +2,7 @@ name: PR Security and Code Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   security-and-code-checks:
@@ -17,11 +17,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Lockfile sync guard (npm ci)
+        run: |
+          npm ci
+          echo "Lockfile and package manifest are in sync."
 
       - name: Run tests
         run: npm test
