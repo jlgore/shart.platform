@@ -3,6 +3,35 @@
 @import '@fontsource/jetbrains-mono/700.css';
 @import '@fontsource/orbitron/700.css';
 
+/* ── Theme variables ─────────────────────────────────────────────────────── */
+/* Amber (default) — phosphor amber terminal aesthetic */
+:root {
+  --color-bg:              #0c0a08;
+  --color-bg-elevated:     #1a1510;
+  --color-primary:         #d4b896;
+  --color-primary-bright:  #e8cba8;
+  --color-primary-muted:   #9a7e60;
+  --color-primary-subtle:  #6b5540;
+  --color-accent:          #4ade80;
+  --color-accent-muted:    #86efac;
+  --color-error:           #f87171;
+  --color-border:          #2a2218;
+}
+
+/* Sage — phosphor green terminal aesthetic */
+html[data-theme="sage"] {
+  --color-bg:              #080c08;
+  --color-bg-elevated:     #101810;
+  --color-primary:         #a8c8a8;
+  --color-primary-bright:  #bcd8bc;
+  --color-primary-muted:   #7a9a7a;
+  --color-primary-subtle:  #527052;
+  --color-accent:          #4ade80;
+  --color-accent-muted:    #86efac;
+  --color-error:           #f87171;
+  --color-border:          #1e2a1e;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
