@@ -42,6 +42,12 @@ function getTrustedOrigins(environment?: string): string[] {
   return [...PROD_TRUSTED_ORIGINS, ...LOCAL_TRUSTED_ORIGINS];
 }
 
+function buildWsUrl(request: Request, sessionId: string): string {
+  const url = new URL(request.url);
+  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${url.host}/ws/${sessionId}`;
+}
+
 function createAuth(env: Env) {
   const db = new Kysely<any>({
     dialect: new D1Dialect({ database: env.DB }) as any,
@@ -217,7 +223,7 @@ app.post('/api/labs/sessions', requireAuth, zValidator('json', createSessionSche
   return c.json({
     session_id: sessionId,
     expires_at: expiresAt,
-    ws_url: `wss://labs.shart.cloud/ws/${sessionId}`,
+    ws_url: buildWsUrl(c.req.raw, sessionId),
   });
 });
 
@@ -362,7 +368,7 @@ app.get('/api/labs/sessions/:labId', requireAuth, async (c) => {
       session_id: session.session_id,
       expires_at: session.expires_at,
       started_at: session.started_at,
-      ws_url: `wss://labs.shart.cloud/ws/${session.session_id}`,
+      ws_url: buildWsUrl(c.req.raw, session.session_id),
     },
   });
 });
@@ -396,7 +402,7 @@ app.get('/api/labs/sessions/:userId/:labId', requireAuth, async (c) => {
       session_id: session.session_id,
       expires_at: session.expires_at,
       started_at: session.started_at,
-      ws_url: `wss://labs.shart.cloud/ws/${session.session_id}`,
+      ws_url: buildWsUrl(c.req.raw, session.session_id),
     },
   });
 });
