@@ -52,6 +52,10 @@ enabled = true
 [env.dev]
 name = "shart-labs-worker-dev"
 
+[[env.dev.routes]]
+pattern = "play-dev.shart.cloud/*"
+zone_name = "shart.cloud"
+
 # Run: wrangler kv namespace create SESSIONS --env dev
 [[env.dev.kv_namespaces]]
 binding = "SESSIONS"
