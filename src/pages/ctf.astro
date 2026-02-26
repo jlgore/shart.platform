@@ -1,4 +1,6 @@
 ---
+export const prerender = false;
+
 import CTFLayout from '../layouts/CTFLayout.astro';
 import { getCollection } from 'astro:content';
 import CertificateSVG from '../components/ctf/CertificateSVG.astro';
@@ -38,7 +40,7 @@ const user = Astro.locals.user;
             </>
           ) : (
             <>
-              <a href="/auth/login?redirect=/ctf/play" class="hub-btn hub-btn-primary">Login to Play</a>
+              <a href="/ctf/play" class="hub-btn hub-btn-primary">Login to Play</a>
               <a href="/auth/register" class="hub-btn hub-btn-secondary">Create Account</a>
             </>
           )}
@@ -107,7 +109,7 @@ const user = Astro.locals.user;
             {user ? (
               <a href="/ctf/dashboard">View your progress →</a>
             ) : (
-              <a href="/auth/login?redirect=/ctf/dashboard">Log in to track progress</a>
+              <a href="/ctf/dashboard">Log in to track progress</a>
             )}
           </p>
         </div>
