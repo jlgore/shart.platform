@@ -3,6 +3,8 @@ export interface Env {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   INSTANCE_SECRET_SALT: string;
+  RESEND_API_KEY?: string;
+  AUTH_FROM_EMAIL?: string;
   ENVIRONMENT?: string;
 }
 

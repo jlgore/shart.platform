@@ -17,6 +17,7 @@ database_id = "786fbd4c-fefe-49ba-b64f-0d345d8bac1b"
 [vars]
 # Non-sensitive config
 ENVIRONMENT = "production"
+AUTH_FROM_EMAIL = "SHART Cloud <onboarding@resend.dev>"
 
 [observability]
 enabled = true
@@ -34,3 +35,4 @@ database_id = "5b4238d6-1fdb-4716-bea7-29d3278f5b40"
 
 [env.dev.vars]
 ENVIRONMENT = "development"
+AUTH_FROM_EMAIL = "SHART Cloud <onboarding@resend.dev>"

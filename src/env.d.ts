@@ -17,6 +17,8 @@ type D1Database = import('@cloudflare/workers-types').D1Database;
 interface CloudflareEnv {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
+  RESEND_API_KEY?: string;
+  AUTH_FROM_EMAIL?: string;
   API_BASE_URL?: string;
   ENVIRONMENT?: string;
 }

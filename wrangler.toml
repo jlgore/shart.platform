@@ -5,6 +5,7 @@ compatibility_flags = [ "nodejs_compat" ]
 
 [vars]
 API_BASE_URL = "http://localhost:8787"
+AUTH_FROM_EMAIL = "SHART Cloud <onboarding@resend.dev>"
 
 [[d1_databases]]
 binding = "DB"
@@ -22,6 +23,7 @@ compatibility_flags = [ "nodejs_compat" ]
 
 [env.prod.vars]
 ENVIRONMENT = "production"
+AUTH_FROM_EMAIL = "SHART Cloud <onboarding@resend.dev>"
 
 routes = [
   { pattern = "shart.cloud/*", zone_name = "shart.cloud" },
@@ -44,6 +46,7 @@ compatibility_flags = [ "nodejs_compat" ]
 
 [env.dev.vars]
 ENVIRONMENT = "development"
+AUTH_FROM_EMAIL = "SHART Cloud <onboarding@resend.dev>"
 
 [[env.dev.routes]]
 pattern = "dev.shart.cloud"

@@ -19,7 +19,13 @@ export interface AuthSession {
 }
 
 // Create auth instance - must be called with runtime env
-export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string; ENVIRONMENT?: string }) {
+export function createAuth(env: {
+  DB: D1Database;
+  BETTER_AUTH_SECRET: string;
+  ENVIRONMENT?: string;
+  RESEND_API_KEY?: string;
+  AUTH_FROM_EMAIL?: string;
+}) {
   const runtimeEnv = env.ENVIRONMENT?.toLowerCase();
   const isProd = runtimeEnv ? runtimeEnv === 'production' : import.meta.env.PROD;
   const isDevDeploy = runtimeEnv === 'development';
@@ -33,6 +39,40 @@ export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string; EN
   const db = new Kysely<any>({
     dialect: new D1Dialect({ database: env.DB }),
   });
+
+  const emailFrom = env.AUTH_FROM_EMAIL || 'SHART Cloud <onboarding@resend.dev>';
+
+  const sendVerificationEmail = async ({ user, url }: { user: { email: string; name?: string | null }; url: string }) => {
+    if (!env.RESEND_API_KEY) {
+      console.warn('RESEND_API_KEY not configured; skipping verification email send');
+      return;
+    }
+
+    const subject = 'Verify your SHART.CLOUD account';
+    const displayName = user.name || user.email;
+    const text = `Hey ${displayName},\n\nVerify your account: ${url}\n\nIf you did not sign up, you can ignore this email.`;
+    const html = `<p>Hey ${displayName},</p><p>Verify your account:</p><p><a href="${url}">${url}</a></p><p>If you did not sign up, you can ignore this email.</p>`;
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: emailFrom,
+        to: user.email,
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Resend error: ${res.status} ${body}`);
+    }
+  };
 
   return betterAuth({
     database: {
@@ -101,6 +141,10 @@ export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string; EN
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendVerificationEmail,
     },
   });
 }
