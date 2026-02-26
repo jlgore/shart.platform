@@ -19,6 +19,7 @@ const error = rawError && rawError.length <= 80 && ALLOWED_ERROR_PREFIXES.some(p
     ? 'Authentication failed'
     : null;
 const registered = Astro.url.searchParams.get('registered');
+const verify = Astro.url.searchParams.get('verify');
 ---
 
 <BaseLayout title="Login">
@@ -41,6 +42,12 @@ const registered = Astro.url.searchParams.get('registered');
         {registered && (
           <div class="auth-message auth-message-success">
             <span class="message-prefix">[OK]</span> Account created successfully. Enter credentials to continue.
+          </div>
+        )}
+
+        {verify && (
+          <div class="auth-message auth-message-success">
+            <span class="message-prefix">[OK]</span> Check your email for a verification link before logging in.
           </div>
         )}
 
@@ -136,7 +143,15 @@ const registered = Astro.url.searchParams.get('registered');
         // Redirect to home or intended destination
         window.location.href = getSafeRedirectPath();
       } else {
-        window.location.href = '/auth/login?error=Authentication%20failed';
+        const data = await res.json().catch(() => ({} as Record<string, unknown>));
+        const code = typeof data.code === 'string' ? data.code : '';
+        const message = typeof data.message === 'string' ? data.message.toLowerCase() : '';
+
+        if (code.includes('EMAIL_NOT_VERIFIED') || message.includes('email not verified')) {
+          window.location.href = '/auth/login?error=Email%20not%20verified';
+        } else {
+          window.location.href = '/auth/login?error=Authentication%20failed';
+        }
       }
     } catch (err) {
       window.location.href = '/auth/login?error=Connection%20failed';
