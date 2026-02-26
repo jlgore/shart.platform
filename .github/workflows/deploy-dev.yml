@@ -19,24 +19,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      # ── Frontend ─────────────────────────────────────────────────────────────
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-
-      - name: Build application
-        run: npm run build
-
-      - name: Deploy frontend (dev)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env dev
-
-      # ── Platform API ─────────────────────────────────────────────────────────
+      # ── Platform API (deploy first — frontend has a service binding to it) ───
       - name: Install platform-api dependencies
         run: npm ci
         working-directory: platform-api
@@ -60,6 +43,23 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: lab-worker
+          command: deploy --env dev
+
+      # ── Frontend (last — depends on platform-api service binding) ────────────
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Deploy frontend (dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env dev
 
       - name: Notify deployment success
