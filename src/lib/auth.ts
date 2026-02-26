@@ -114,6 +114,10 @@ export function createAuth(env: {
           ]),
     ],
     advanced: {
+      crossSubdomainCookies: {
+        enabled: isProd || isDevDeploy,
+        domain: '.shart.cloud',
+      },
       ipAddress: {
         ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for'],
         ipv6Subnet: 64,

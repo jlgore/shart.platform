@@ -54,11 +54,19 @@ function createAuth(env: Env) {
   });
 
   const isProd = env.ENVIRONMENT === 'production';
+  const isDev = env.ENVIRONMENT === 'development';
+  const baseURL = isProd
+    ? 'https://labs.shart.cloud'
+    : isDev
+      ? 'https://labs-dev.shart.cloud'
+      : 'http://localhost:8787';
+
   const trustedOrigins = [
     'https://shart.cloud',
     'https://www.shart.cloud',
-    'https://platform.shart.cloud',
     'https://labs.shart.cloud',
+    'https://dev.shart.cloud',
+    'https://labs-dev.shart.cloud',
     ...(isProd ? [] : ['http://localhost:4321', 'http://localhost:8787', 'http://localhost:8788']),
   ];
 
@@ -76,8 +84,14 @@ function createAuth(env: Env) {
     },
     account: { modelName: 'accounts' },
     verification: { modelName: 'verifications' },
-    baseURL: isProd ? 'https://platform.shart.cloud' : 'http://localhost:8787',
+    baseURL,
     trustedOrigins,
+    advanced: {
+      crossSubdomainCookies: {
+        enabled: isProd || isDev,
+        domain: '.shart.cloud',
+      },
+    },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
