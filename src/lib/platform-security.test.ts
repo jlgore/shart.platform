@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRUSTED_ORIGINS,
+  getTrustedOrigins,
   buildRateLimitBucket,
   extractRequestOrigin,
   isRateLimitExceeded,
@@ -39,5 +40,14 @@ describe('platform security helpers', () => {
   it('flags counts over max as exceeded', () => {
     expect(isRateLimitExceeded(10, 10)).toBe(false);
     expect(isRateLimitExceeded(11, 10)).toBe(true);
+  });
+
+  it('uses stricter origin allowlist in production', () => {
+    const prodOrigins = getTrustedOrigins('production');
+    const devOrigins = getTrustedOrigins('development');
+
+    expect(prodOrigins).toContain('https://shart.cloud');
+    expect(prodOrigins).not.toContain('http://localhost:4321');
+    expect(devOrigins).toContain('http://localhost:4321');
   });
 });

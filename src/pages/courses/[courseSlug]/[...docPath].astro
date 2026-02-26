@@ -6,13 +6,13 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { GitHubREADMEFetcher } from '../../../lib/github/readme-fetcher.js';
 import { discoverCourseDocs, inferCourseDocFromPath, type CourseDoc } from '../../../lib/github/course-discovery.js';
 import { sanitizeHtml } from '../../../lib/sanitize-html.js';
-import { getSessionToken } from '../../../lib/auth-helpers';
+import { requireAuth } from '../../../lib/auth-helpers';
 import { getCourseProgress } from '../../../lib/api-client';
 import CourseMarkComplete from '../../../components/courses/CourseMarkComplete.tsx';
 import CourseDocEnhancer from '../../../components/courses/CourseDocEnhancer.tsx';
 
 const user = Astro.locals.user;
-const courseSlug = Astro.params.courseSlug;
+const courseSlug = Astro.params.courseSlug ?? '';
 const docPathParam = Astro.params.docPath ?? '';
 
 const allCourses = await getCollection('courses', ({ data }) => data.draft !== true && data.isActive !== false);
@@ -67,14 +67,12 @@ const apiBase = Astro.locals.runtime?.env?.API_BASE_URL
 
 let isCompleted = false;
 if (user) {
-  const sessionToken = getSessionToken(Astro);
-  if (sessionToken) {
-    try {
-      const progress = await getCourseProgress(courseSlug, sessionToken, apiBase);
-      isCompleted = progress.completed_docs.includes(normalizedDocPath);
-    } catch {
-      // ignore - defaults to false
-    }
+  try {
+    const authCookieHeader = requireAuth(Astro);
+    const progress = await getCourseProgress(courseSlug, authCookieHeader, { apiBase });
+    isCompleted = progress.completed_docs.includes(normalizedDocPath);
+  } catch {
+    // ignore - defaults to false
   }
 }
 

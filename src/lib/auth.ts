@@ -20,6 +20,8 @@ export interface AuthSession {
 
 // Create auth instance - must be called with runtime env
 export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string }) {
+  const isProd = import.meta.env.PROD;
+
   // Create Kysely instance with D1 dialect
   const db = new Kysely<any>({
     dialect: new D1Dialect({ database: env.DB }),
@@ -50,14 +52,18 @@ export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string }) 
     verification: {
       modelName: 'verifications',
     },
-    baseURL: import.meta.env.PROD ? 'https://shart.cloud' : 'http://localhost:8788',
+    baseURL: isProd ? 'https://shart.cloud' : 'http://localhost:8788',
     trustedOrigins: [
       'https://shart.cloud',
       'https://www.shart.cloud',
       'https://platform.shart.cloud',
-      'http://localhost:4321',
-      'http://localhost:8788',
-      'http://127.0.0.1:8788',
+      ...(isProd
+        ? []
+        : [
+            'http://localhost:4321',
+            'http://localhost:8788',
+            'http://127.0.0.1:8788',
+          ]),
     ],
     advanced: {
       ipAddress: {
@@ -86,7 +92,7 @@ export function createAuth(env: { DB: D1Database; BETTER_AUTH_SECRET: string }) 
     },
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
     },
   });
 }

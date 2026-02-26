@@ -2,6 +2,38 @@ import { betterAuth } from 'better-auth';
 import { D1Dialect } from 'kysely-d1';
 import { Kysely } from 'kysely';
 import type { Env } from './types';
+import type { AuthMethod } from './security';
+
+type SessionLookupResult = {
+  userId: string;
+  authMethod: AuthMethod;
+};
+
+function detectAuthMethod(headers: Headers): AuthMethod | null {
+  const authHeader = headers.get('Authorization');
+  const cookieHeader = headers.get('Cookie') || '';
+  if (authHeader?.startsWith('Bearer ')) return 'bearer';
+  if (/better-auth\.session_token/.test(cookieHeader)) return 'cookie';
+  return null;
+}
+
+export async function resolveSessionFromRequest(
+  env: Env,
+  headers: Headers
+): Promise<SessionLookupResult | null> {
+  const authMethod = detectAuthMethod(headers);
+  if (!authMethod) return null;
+
+  const auth = createAuth(env);
+
+  const currentSession = await auth.api.getSession({ headers }).catch(() => null);
+  if (!currentSession) return null;
+
+  return {
+    userId: currentSession.user.id,
+    authMethod,
+  };
+}
 
 export function createAuth(env: Env) {
   // Create Kysely instance with D1 dialect for better-auth
@@ -10,6 +42,18 @@ export function createAuth(env: Env) {
   });
 
   const isProd = env.ENVIRONMENT === 'production';
+  const trustedOrigins = [
+    'https://shart.cloud',
+    'https://www.shart.cloud',
+    'https://platform.shart.cloud',
+    ...(isProd
+      ? []
+      : [
+          'http://localhost:4321',
+          'http://localhost:8787',
+          'http://localhost:8788',
+        ]),
+  ];
 
   return betterAuth({
     database: {
@@ -33,14 +77,7 @@ export function createAuth(env: Env) {
       modelName: 'verifications',
     },
     baseURL: isProd ? 'https://platform.shart.cloud' : 'http://localhost:8787',
-    trustedOrigins: [
-      'https://shart.cloud',
-      'https://www.shart.cloud',
-      'https://platform.shart.cloud',
-      'http://localhost:4321',
-      'http://localhost:8787',
-      'http://localhost:8788',
-    ],
+    trustedOrigins,
     advanced: {
       ipAddress: {
         ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for'],
@@ -68,7 +105,7 @@ export function createAuth(env: Env) {
     },
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
     },
   });
 }

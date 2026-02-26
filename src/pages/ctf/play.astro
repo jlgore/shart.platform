@@ -5,7 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { requireAuth } from '../../lib/auth-helpers';
 import { getQuestions, getStatus, ApiError, type Question } from '../../lib/api-client';
 
-const sessionToken = requireAuth(Astro);
+const authCookieHeader = requireAuth(Astro);
 const user = Astro.locals.user!;
 const apiBase = Astro.locals.runtime?.env?.API_BASE_URL;
 
@@ -17,8 +17,8 @@ let error = null;
 
 try {
   [questions, status] = await Promise.all([
-    getQuestions(ctfSlug, sessionToken, apiBase),
-    getStatus(ctfSlug, sessionToken, apiBase).catch(() => null),
+    getQuestions(ctfSlug, authCookieHeader, { apiBase }),
+    getStatus(ctfSlug, authCookieHeader, { apiBase }).catch(() => null),
   ]);
 } catch (e) {
   if (e instanceof ApiError) {

@@ -471,9 +471,6 @@ if (!user) {
       sessionId = data.session_id;
       expiresAt = data.expires_at;
 
-      // Update URL so a reload reconnects to the same session
-      history.replaceState(null, '', `?labId=${labId}&session=${sessionId}`);
-
       startTimer();
       initTerminal(data.ws_url);
     } catch (err) {
@@ -485,27 +482,36 @@ if (!user) {
 
   // ─── Reconnect to existing session ────────────────────────────────────────
 
-  async function reconnectSession() {
-    const parts = sessionId.split(':');
-    if (parts.length !== 3) { location.replace('/labs'); return; }
-    const [userId, labIdFromSession] = parts;
+  async function reconnectSession(quiet = false) {
+    if (!labId) { location.replace('/labs'); return; }
 
-    setStatus('connecting', 'reconnecting...');
-    showMessage('Reconnecting to your session...');
+    if (!quiet) {
+      setStatus('connecting', 'reconnecting...');
+      showMessage('Reconnecting to your session...');
+    }
     $btnStart.style.display = 'none';
 
     try {
-      const res = await fetch(`${LAB_API}/api/labs/sessions/${userId}/${labIdFromSession}`, {
+      const res = await fetch(`${LAB_API}/api/labs/sessions/${encodeURIComponent(labId)}`, {
         credentials: 'include',
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      if (!data.session || data.session.session_id !== sessionId) {
+      if (!data.session) {
+        if (quiet) {
+          $btnStart.style.display = '';
+          return;
+        }
         throw new Error('Session no longer active');
       }
 
+      if (sessionId && data.session.session_id !== sessionId) {
+        throw new Error('Session mismatch');
+      }
+
+      sessionId = data.session.session_id;
       expiresAt = data.session.expires_at;
       startTimer();
       initTerminal(data.session.ws_url);
@@ -513,7 +519,9 @@ if (!user) {
       setStatus('idle', 'idle');
       $btnStart.style.display = '';
       $btnStart.disabled = false;
-      showMessage(`Could not reconnect: ${err.message}. Start a new session.`);
+      if (!quiet) {
+        showMessage(`Could not reconnect: ${err.message}. Start a new session.`);
+      }
     }
   }
 
@@ -522,6 +530,8 @@ if (!user) {
   $btnStart.addEventListener('click', startSession);
 
   if (sessionId) {
-    reconnectSession();
+    reconnectSession(false);
+  } else if (labId) {
+    reconnectSession(true);
   }
 </script>

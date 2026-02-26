@@ -1,15 +1,14 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database, Env, QuestionWithProgress, Hint, PlayerStatus, LeaderboardEntry } from './types';
 import { createDb, generateId, hashInstanceSecret, verifyInstanceSecret, deriveFlag } from './db';
-import { createAuth } from './auth';
+import { createAuth, resolveSessionFromRequest } from './auth';
 import { nanoid } from 'nanoid';
 import {
-  TRUSTED_ORIGINS,
+  getTrustedOrigins,
   buildRateLimitBucket,
   extractRequestOrigin,
   isRateLimitExceeded,
@@ -93,7 +92,8 @@ function getRequestOrigin(c: any): string | null {
 async function requireTrustedOriginForCookieAuth(c: any, next: any) {
   const origin = getRequestOrigin(c);
   const authMethod = c.get('authMethod') as AuthMethod | undefined;
-  if (shouldRejectCsrfForCookieAuth(authMethod, origin, TRUSTED_ORIGINS)) {
+  const trustedOrigins = getTrustedOrigins(c.env.ENVIRONMENT);
+  if (shouldRejectCsrfForCookieAuth(authMethod, origin, trustedOrigins)) {
     return c.json({ error: 'CSRF validation failed' }, 403);
   }
 
@@ -161,12 +161,33 @@ function withRateLimit(config: RateLimitConfig) {
 // ============================================================================
 
 app.use('*', logger());
-app.use('*', cors({
-  origin: [...TRUSTED_ORIGINS],
-  credentials: true,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use('*', async (c, next) => {
+  const trustedOrigins = getTrustedOrigins(c.env.ENVIRONMENT);
+  const requestOrigin = c.req.header('Origin');
+  const allowOrigin = requestOrigin && trustedOrigins.includes(requestOrigin) ? requestOrigin : null;
+
+  if (c.req.method === 'OPTIONS') {
+    const headers = new Headers();
+    headers.set('Vary', 'Origin');
+    if (allowOrigin) {
+      headers.set('Access-Control-Allow-Origin', allowOrigin);
+      headers.set('Access-Control-Allow-Credentials', 'true');
+      headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+    return new Response(null, { status: 204, headers });
+  }
+
+  await next();
+
+  c.header('Vary', 'Origin');
+  if (allowOrigin) {
+    c.header('Access-Control-Allow-Origin', allowOrigin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+});
 
 // Initialize database for all requests
 app.use('*', async (c, next) => {
@@ -176,56 +197,23 @@ app.use('*', async (c, next) => {
 
 // Auth middleware
 async function requireAuth(c: any, next: any) {
-  const db = c.get('db') as Kysely<Database>;
-  const authHeader = c.req.header('Authorization');
-  const cookieHeader = c.req.header('Cookie') || '';
-  const bearerToken = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length)
-    : undefined;
-  const cookieToken = cookieHeader.match(/better-auth\.session_token=([^;]+)/)?.[1];
-  const sessionToken = bearerToken || cookieToken;
+  const resolved = await resolveSessionFromRequest(c.env, c.req.raw.headers);
 
-  if (!sessionToken) {
+  if (!resolved) {
     return c.json({ error: 'Authentication required' }, 401);
   }
 
-  const session = await db
-    .selectFrom('sessions')
-    .where('token', '=', sessionToken)
-    .where('expiresAt', '>', new Date().toISOString())
-    .selectAll()
-    .executeTakeFirst();
-
-  if (!session) {
-    return c.json({ error: 'Invalid or expired session' }, 401);
-  }
-
-  c.set('authMethod', bearerToken ? 'bearer' : 'cookie');
-  c.set('userId', session.userId);
+  c.set('authMethod', resolved.authMethod);
+  c.set('userId', resolved.userId);
   await next();
 }
 
 async function optionalAuth(c: any, next: any) {
-  const db = c.get('db') as Kysely<Database>;
-  const authHeader = c.req.header('Authorization');
-  const cookieHeader = c.req.header('Cookie') || '';
-  const bearerToken = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length)
-    : undefined;
-  const cookieToken = cookieHeader.match(/better-auth\.session_token=([^;]+)/)?.[1];
-  const sessionToken = bearerToken || cookieToken;
+  const resolved = await resolveSessionFromRequest(c.env, c.req.raw.headers);
 
-  if (sessionToken) {
-    const session = await db
-      .selectFrom('sessions')
-      .where('token', '=', sessionToken)
-      .where('expiresAt', '>', new Date().toISOString())
-      .selectAll()
-      .executeTakeFirst();
-    if (session) {
-      c.set('authMethod', bearerToken ? 'bearer' : 'cookie');
-      c.set('userId', session.userId);
-    }
+  if (resolved) {
+    c.set('authMethod', resolved.authMethod);
+    c.set('userId', resolved.userId);
   }
   await next();
 }

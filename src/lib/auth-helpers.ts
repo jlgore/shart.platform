@@ -5,26 +5,24 @@
 import type { AstroGlobal } from 'astro';
 
 /**
- * Extract session token from request cookies
+ * Extract raw cookie header from request
  */
-export function getSessionToken(Astro: AstroGlobal): string | null {
-  const cookieHeader = Astro.request.headers.get('cookie') || '';
-  const match = cookieHeader.match(/better-auth\.session_token=([^;]+)/);
-  return match ? match[1] : null;
+export function getAuthCookieHeader(Astro: AstroGlobal): string | null {
+  return Astro.request.headers.get('cookie');
 }
 
 /**
  * Require authentication - redirects to login if not authenticated
- * Returns the session token if authenticated
+ * Returns cookie header if authenticated
  */
 export function requireAuth(Astro: AstroGlobal): string {
   const user = Astro.locals.user;
-  const sessionToken = getSessionToken(Astro);
+  const cookieHeader = getAuthCookieHeader(Astro);
 
-  if (!user || !sessionToken) {
+  if (!user || !cookieHeader) {
     const returnUrl = encodeURIComponent(Astro.url.pathname);
     throw Astro.redirect(`/auth/login?redirect=${returnUrl}`);
   }
 
-  return sessionToken;
+  return cookieHeader;
 }

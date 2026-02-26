@@ -1,12 +1,27 @@
 export type AuthMethod = 'bearer' | 'cookie';
 
-export const TRUSTED_ORIGINS = [
+const PROD_TRUSTED_ORIGINS = [
   'https://shart.cloud',
   'https://www.shart.cloud',
+  'https://platform.shart.cloud',
+  'https://labs.shart.cloud',
+] as const;
+
+const LOCAL_TRUSTED_ORIGINS = [
   'http://localhost:4321',
   'http://localhost:8787',
   'http://localhost:8788',
 ] as const;
+
+export function getTrustedOrigins(environment?: string): string[] {
+  const env = (environment || 'development').toLowerCase();
+  if (env === 'production') {
+    return [...PROD_TRUSTED_ORIGINS];
+  }
+  return [...PROD_TRUSTED_ORIGINS, ...LOCAL_TRUSTED_ORIGINS];
+}
+
+export const TRUSTED_ORIGINS = getTrustedOrigins();
 
 export function extractRequestOrigin(originHeader?: string, refererHeader?: string): string | null {
   if (originHeader) return originHeader;

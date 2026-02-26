@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { Kysely } from 'kysely';
+import { betterAuth } from 'better-auth';
+import { Kysely } from 'kysely';
+import { D1Dialect } from 'kysely-d1';
 import type { Database, Env } from './types';
 import { createDb } from './db';
 import {
@@ -20,15 +21,63 @@ export { LabContainer } from './container';
 // Trusted origins
 // ============================================================================
 
-const TRUSTED_ORIGINS = [
+const PROD_TRUSTED_ORIGINS = [
   'https://shart.cloud',
   'https://www.shart.cloud',
   'https://dev.shart.cloud',
   'https://labs.shart.cloud',
+] as const;
+
+const LOCAL_TRUSTED_ORIGINS = [
   'http://localhost:4321',
   'http://localhost:8788',
   'http://localhost:8787',
-];
+] as const;
+
+function getTrustedOrigins(environment?: string): string[] {
+  const env = (environment || 'development').toLowerCase();
+  if (env === 'production') {
+    return [...PROD_TRUSTED_ORIGINS];
+  }
+  return [...PROD_TRUSTED_ORIGINS, ...LOCAL_TRUSTED_ORIGINS];
+}
+
+function createAuth(env: Env) {
+  const db = new Kysely<any>({
+    dialect: new D1Dialect({ database: env.DB }) as any,
+  });
+
+  const isProd = env.ENVIRONMENT === 'production';
+  const trustedOrigins = [
+    'https://shart.cloud',
+    'https://www.shart.cloud',
+    'https://platform.shart.cloud',
+    'https://labs.shart.cloud',
+    ...(isProd ? [] : ['http://localhost:4321', 'http://localhost:8787', 'http://localhost:8788']),
+  ];
+
+  return betterAuth({
+    database: {
+      db,
+      type: 'sqlite',
+    },
+    secret: env.BETTER_AUTH_SECRET,
+    user: { modelName: 'users' },
+    session: {
+      modelName: 'sessions',
+      expiresIn: 60 * 60 * 24 * 7,
+      updateAge: 60 * 60 * 24,
+    },
+    account: { modelName: 'accounts' },
+    verification: { modelName: 'verifications' },
+    baseURL: isProd ? 'https://platform.shart.cloud' : 'http://localhost:8787',
+    trustedOrigins,
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+    },
+  });
+}
 
 // ============================================================================
 // App setup
@@ -42,15 +91,33 @@ type Variables = {
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 app.use('*', logger());
-app.use(
-  '*',
-  cors({
-    origin: TRUSTED_ORIGINS,
-    credentials: true,
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+app.use('*', async (c, next) => {
+  const trustedOrigins = getTrustedOrigins(c.env.ENVIRONMENT);
+  const requestOrigin = c.req.header('Origin');
+  const allowOrigin = requestOrigin && trustedOrigins.includes(requestOrigin) ? requestOrigin : null;
+
+  if (c.req.method === 'OPTIONS') {
+    const headers = new Headers();
+    headers.set('Vary', 'Origin');
+    if (allowOrigin) {
+      headers.set('Access-Control-Allow-Origin', allowOrigin);
+      headers.set('Access-Control-Allow-Credentials', 'true');
+      headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+    return new Response(null, { status: 204, headers });
+  }
+
+  await next();
+
+  c.header('Vary', 'Origin');
+  if (allowOrigin) {
+    c.header('Access-Control-Allow-Origin', allowOrigin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+});
 
 app.use('*', async (c, next) => {
   c.set('db', createDb(c.env));
@@ -62,30 +129,24 @@ app.use('*', async (c, next) => {
 // Validates better-auth session token against the shared D1 sessions table.
 // ============================================================================
 
+async function resolveSessionFromRequest(
+  env: Env,
+  headers: Headers
+): Promise<{ userId: string } | null> {
+  const auth = createAuth(env);
+  const session = await auth.api.getSession({ headers }).catch(() => null);
+  if (!session) return null;
+  return { userId: session.user.id };
+}
+
 async function requireAuth(c: any, next: any) {
-  const db = c.get('db') as Kysely<Database>;
-  const authHeader = c.req.header('Authorization');
-  const cookieHeader = c.req.header('Cookie') || '';
-  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-  const cookieToken = cookieHeader.match(/better-auth\.session_token=([^;]+)/)?.[1];
-  const sessionToken = bearerToken || cookieToken;
+  const resolved = await resolveSessionFromRequest(c.env, c.req.raw.headers);
 
-  if (!sessionToken) {
-    return c.json({ error: 'Authentication required' }, 401);
-  }
-
-  const session = await db
-    .selectFrom('sessions')
-    .where('token', '=', sessionToken)
-    .where('expiresAt', '>', new Date().toISOString())
-    .select(['userId'])
-    .executeTakeFirst();
-
-  if (!session) {
+  if (!resolved) {
     return c.json({ error: 'Invalid or expired session' }, 401);
   }
 
-  c.set('userId', session.userId);
+  c.set('userId', resolved.userId);
   await next();
 }
 
@@ -175,11 +236,24 @@ app.get('/ws/:sessionId', async (c) => {
 
   // Validate Origin to prevent cross-site WebSocket hijacking
   const origin = c.req.header('Origin');
-  if (origin && !TRUSTED_ORIGINS.includes(origin)) {
+  const trustedOrigins = getTrustedOrigins(c.env.ENVIRONMENT);
+  if (origin && !trustedOrigins.includes(origin)) {
     return new Response('Forbidden origin', { status: 403 });
   }
 
+  // Require an authenticated caller and bind WS session to that user.
+  const db = c.get('db') as Kysely<Database>;
+  const resolved = await resolveSessionFromRequest(c.env, c.req.raw.headers);
+  if (!resolved) {
+    return new Response('Authentication required', { status: 401 });
+  }
+
   const sessionId = c.req.param('sessionId');
+  const [sessionUserId] = sessionId.split(':');
+  if (!sessionUserId || sessionUserId !== resolved.userId) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
   const { valid, reason, kvSession } = await validateSessionForWS(c.env, sessionId);
 
   if (!valid || !kvSession) {
@@ -187,7 +261,6 @@ app.get('/ws/:sessionId', async (c) => {
   }
 
   // Update heartbeat (fire-and-forget — don't block the WS upgrade)
-  const db = c.get('db') as Kysely<Database>;
   c.executionCtx.waitUntil(updateLastActive(db, sessionId));
 
   // Proxy WebSocket to container
@@ -263,9 +336,38 @@ app.post('/api/labs/complete', async (c) => {
 });
 
 // ============================================================================
-// GET /api/labs/sessions/:userId/:labId — Check if an active session exists
+// GET /api/labs/sessions/:labId — Check if an active session exists
 // ============================================================================
 
+app.get('/api/labs/sessions/:labId', requireAuth, async (c) => {
+  const userId = c.get('userId') as string;
+  const { labId } = c.req.param();
+
+  const db = c.get('db') as Kysely<Database>;
+  const session = await db
+    .selectFrom('lab_sessions')
+    .where('user_id', '=', userId)
+    .where('lab_id', '=', labId)
+    .where('status', '=', 'active')
+    .orderBy('started_at', 'desc')
+    .select(['session_id', 'expires_at', 'started_at'])
+    .executeTakeFirst();
+
+  if (!session) {
+    return c.json({ session: null });
+  }
+
+  return c.json({
+    session: {
+      session_id: session.session_id,
+      expires_at: session.expires_at,
+      started_at: session.started_at,
+      ws_url: `wss://labs.shart.cloud/ws/${session.session_id}`,
+    },
+  });
+});
+
+// Legacy endpoint retained for older clients.
 app.get('/api/labs/sessions/:userId/:labId', requireAuth, async (c) => {
   const requestingUserId = c.get('userId') as string;
   const { userId, labId } = c.req.param();

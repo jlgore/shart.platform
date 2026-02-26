@@ -10,7 +10,9 @@ if (user) {
   return Astro.redirect('/');
 }
 
-const error = Astro.url.searchParams.get('error');
+const rawError = Astro.url.searchParams.get('error');
+const allowedErrors = ['Passwords do not match', 'Registration failed', 'Connection failed'];
+const error = rawError && allowedErrors.includes(rawError) ? rawError : null;
 ---
 
 <BaseLayout title="Register">
@@ -149,9 +151,7 @@ const error = Astro.url.searchParams.get('error');
       if (res.ok) {
         window.location.href = '/auth/login?registered=1';
       } else {
-        const data = await res.json().catch(() => ({}));
-        const errorMsg = data.message || 'Registration failed';
-        window.location.href = `/auth/register?error=${encodeURIComponent(errorMsg)}`;
+        window.location.href = '/auth/register?error=Registration%20failed';
       }
     } catch (err) {
       window.location.href = '/auth/register?error=Connection%20failed';

@@ -136,9 +136,7 @@ const registered = Astro.url.searchParams.get('registered');
         // Redirect to home or intended destination
         window.location.href = getSafeRedirectPath();
       } else {
-        const data = await res.json().catch(() => ({}));
-        const errorMsg = data.message || 'Invalid credentials';
-        window.location.href = `/auth/login?error=${encodeURIComponent(errorMsg)}`;
+        window.location.href = '/auth/login?error=Authentication%20failed';
       }
     } catch (err) {
       window.location.href = '/auth/login?error=Connection%20failed';

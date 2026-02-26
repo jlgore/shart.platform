@@ -1,6 +1,7 @@
 // Cloudflare Worker environment bindings
 export interface Env {
   DB: D1Database;
+  BETTER_AUTH_SECRET: string;
   SESSIONS: KVNamespace;
   LAB_CONTAINER: DurableObjectNamespace;
   COMPLETION_WEBHOOK_SECRET: string;
