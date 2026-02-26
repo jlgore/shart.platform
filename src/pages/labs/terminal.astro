@@ -19,7 +19,13 @@ const user = Astro.locals.user;
 if (!user) {
   return Astro.redirect(`/auth/login?redirect=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
 }
+
+const labWorkerUrl = (Astro.locals.runtime?.env as any)?.LAB_WORKER_URL ?? 'https://labs.shart.cloud';
 ---
+
+<script is:inline define:vars={{ labWorkerUrl }}>
+  window.__LAB_WORKER_URL = labWorkerUrl;
+</script>
 
 <BaseLayout title="Lab Terminal" description="Interactive lab environment">
   <div id="lab-terminal-root">
@@ -200,7 +206,7 @@ if (!user) {
   import { FitAddon } from '@xterm/addon-fit';
   import '@xterm/xterm/css/xterm.css';
 
-  const LAB_API = import.meta.env.PUBLIC_LAB_WORKER_URL ?? 'https://labs.shart.cloud';
+  const LAB_API = window.__LAB_WORKER_URL ?? 'https://labs.shart.cloud';
 
   // ─── State ────────────────────────────────────────────────────────────────
 

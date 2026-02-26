@@ -24,6 +24,7 @@ compatibility_flags = [ "nodejs_compat" ]
 [env.prod.vars]
 ENVIRONMENT = "production"
 AUTH_FROM_EMAIL = "SHART Cloud <onboarding@mx.shart.cloud>"
+LAB_WORKER_URL = "https://labs.shart.cloud"
 
 routes = [
   { pattern = "shart.cloud/*", zone_name = "shart.cloud" },
@@ -47,6 +48,7 @@ compatibility_flags = [ "nodejs_compat" ]
 [env.dev.vars]
 ENVIRONMENT = "development"
 AUTH_FROM_EMAIL = "SHART Cloud <onboarding@mx.shart.cloud>"
+LAB_WORKER_URL = "https://labs-dev.shart.cloud"
 
 [[env.dev.routes]]
 pattern = "dev.shart.cloud"

@@ -7,12 +7,15 @@ const user = Astro.locals.user;
 if (!user) {
   return Astro.redirect(`/auth/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
 }
+
+const labWorkerUrl = (Astro.locals.runtime?.env as any)?.LAB_WORKER_URL ?? 'https://labs.shart.cloud';
 ---
 
 <BaseLayout title="Lab History" description="Your completed labs">
   <meta name="user-id" content={user.id} slot="head" />
-  <script define:vars={{ userId: user.id }} is:inline>
+  <script define:vars={{ userId: user.id, labWorkerUrl }} is:inline>
     window.__LAB_USER_ID = userId;
+    window.__LAB_WORKER_URL = labWorkerUrl;
   </script>
   <div id="history-root">
     <div id="history-header">
@@ -126,7 +129,7 @@ if (!user) {
 
 <script>
   // @ts-nocheck
-  const LAB_API = import.meta.env.PUBLIC_LAB_WORKER_URL ?? 'https://labs.shart.cloud';
+  const LAB_API = window.__LAB_WORKER_URL ?? 'https://labs.shart.cloud';
 
   const $loading = document.getElementById('history-loading');
   const $error   = document.getElementById('history-error');
