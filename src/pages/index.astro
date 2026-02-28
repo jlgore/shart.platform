@@ -45,7 +45,7 @@ const [nextEvent] = await getUpcomingEvents(1);
     </section>
   )}
 
-  <section class="home-section home-section-drops">
+  <section class={`home-section home-section-drops ${nextEvent ? '' : 'home-section-drops--no-live'}`}>
     <SectionHeader
       title="Recent Drops"
       description="New blog posts and lab content from the training pipeline."
@@ -184,6 +184,10 @@ const [nextEvent] = await getUpcomingEvents(1);
 
   .home-section-live {
     margin-top: 2.5rem;
+  }
+
+  .home-section-drops--no-live {
+    margin-top: 1.2rem;
   }
 
   .live-card {
