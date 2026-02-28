@@ -160,6 +160,16 @@ async function resolveSessionFromRequest(
 }
 
 async function requireAuth(c: any, next: any) {
+  if ((c.env.ENVIRONMENT || '').toLowerCase() === 'development') {
+    const cookieHeader = c.req.raw.headers.get('cookie') || '';
+    const hasCookieHeader = cookieHeader.length > 0;
+    const hasSessionTokenCookieName = cookieHeader.includes('better-auth.session_token=');
+    console.log('[labs-auth-debug] request cookie presence', {
+      hasCookieHeader,
+      hasSessionTokenCookieName,
+    });
+  }
+
   const resolved = await resolveSessionFromRequest(c.env, c.req.raw.headers);
 
   if (!resolved) {
