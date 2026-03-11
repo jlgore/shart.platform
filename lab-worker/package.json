@@ -13,7 +13,7 @@
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
     "@hono/zod-validator": "^0.7.5",
-    "hono": "^4.6.0",
+    "hono": "^4.12.7",
     "kysely": "^0.27.0",
     "kysely-d1": "^0.3.0",
     "nanoid": "^5.0.0",
